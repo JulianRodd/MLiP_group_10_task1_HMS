@@ -50,3 +50,19 @@ def create_non_overlapping_eeg_crops(df: pd.DataFrame, label_cols: list) -> pd.D
     except Exception as e:
         logger.error(f"Error in preprocessing data: {e}")
         raise
+
+
+def filter_by_agreement(df:pd.DataFrame, min:float):
+    '''
+    Takes train/test.csv
+    Returns df with rows having more than min agreement (min in %). 
+    '''
+    
+    vote_cols = ['seizure_vote','lpd_vote', 'gpd_vote', 'lrda_vote','grda_vote','other_vote']
+    max_votes = df[vote_cols].max(axis=1)
+    total_votes = df[vote_cols].sum(axis=1)
+    min /= 100
+    bool_filter = (max_votes/total_votes)>min
+
+    return df[bool_filter]
+
