@@ -4,7 +4,7 @@ import librosa
 import matplotlib.pyplot as plt
 from utils.signal_preprocessing_utils import denoise
 from generics.configs import DataConfig  
-from logging import getLogger
+from utils.general_utils import get_logger
 
 
 def generate_spectrogram_from_eeg(parquet_path: str, display: bool = False, display_eeg_id: int = 0) -> np.ndarray:
@@ -23,7 +23,7 @@ def generate_spectrogram_from_eeg(parquet_path: str, display: bool = False, disp
         FileNotFoundError: If the specified Parquet file does not exist.
         Exception: For issues encountered during the processing of EEG data.
     """
-    logger = getLogger('utils/generate_spectrogram_from_eeg')
+    logger = get_logger('utils/generate_spectrogram_from_eeg')
     try:
         eeg = pd.read_parquet(parquet_path)
     except FileNotFoundError:

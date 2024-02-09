@@ -1,14 +1,15 @@
-from logging import getLogger, basicConfig, INFO
 from datasets.data_loader import CustomDataset
-
 from generics.configs import DataConfig
-basicConfig(level=INFO)
+from utils.general_utils import get_logger
+
 
 def main():
-    logger = getLogger('main')
+    logger = get_logger('main')
     config = DataConfig() 
-    dataset = CustomDataset(config=config, subset_sample_count=100, mode="train")
+    dataset = CustomDataset(config=config, subset_sample_count=100, mode="train", cache=True)
     dataset.print_summary()
+    dataset.plot_samples(n_samples=1)
+
 
 
 

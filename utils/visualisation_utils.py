@@ -1,41 +1,78 @@
 from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
-from logging import getLogger
+from utils.general_utils import get_logger
 
-def plot_spectrogram(spectrogram_path: str):
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from utils.general_utils import get_logger
+import plotly.graph_objects as go
+import numpy as np
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import numpy as np
+from utils.general_utils import get_logger
+
+
+def plot_spectrogram(data):
     """
-    Source: https://www.kaggle.com/code/mvvppp/hms-eda-and-domain-journey
-    Visualize spectrogram recordings from a parquet file.
-    :param spectrogram_path: path to the spectrogram parquet.
-    """
+    Visualize spectrogram data.
     
-    logger = getLogger('utils/vizualisation_utils/plot_spectrogram')
-    sample_spect = pd.read_parquet(spectrogram_path)
-    logger.info(f"Loaded spectrogram: {spectrogram_path}")
-    split_spect = {
-        "LL": sample_spect.filter(regex='^LL', axis=1),
-        "RL": sample_spect.filter(regex='^RL', axis=1),
-        "RP": sample_spect.filter(regex='^RP', axis=1),
-        "LP": sample_spect.filter(regex='^LP', axis=1),
-    }
+    Args:
+    data (np.ndarray): Spectrogram data to visualize.
+    """
 
-    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(15, 12))
-    axes = axes.flatten()
-    label_interval = 5
-    for i, split_name in enumerate(split_spect.keys()):
-        ax = axes[i]
-        img = ax.imshow(np.log(split_spect[split_name]).T, cmap='viridis', aspect='auto', origin='lower')
-        cbar = fig.colorbar(img, ax=ax)
-        cbar.set_label('Log(Value)')
-        ax.set_title(split_name)
-        ax.set_ylabel("Frequency (Hz)")
-        ax.set_xlabel("Time")
+    logger = get_logger('utils/vizualisation_utils/plot_spectrogram')
+    logger.info("Plotting spectrogram with Plotly")
 
-        ax.set_yticks(np.arange(len(split_spect[split_name].columns)))
-        ax.set_yticklabels([column_name[3:] for column_name in split_spect[split_name].columns])
-        frequencies = [column_name[3:] for column_name in split_spect[split_name].columns]
-        ax.set_yticks(np.arange(0, len(split_spect[split_name].columns), label_interval))
-        ax.set_yticklabels(frequencies[::label_interval])
-    plt.tight_layout()
-    plt.show()
+    fig = go.Figure(data=go.Heatmap(
+        z=np.log(data + 1e-6), # Log transform with a small constant to avoid log(0)
+        colorscale='Viridis'
+    ))
+
+    fig.update_layout(
+        title='Spectrogram Visualization',
+        xaxis=dict(title='Time'),
+        yaxis=dict(title='Frequency')
+    )
+
+    fig.show()
+
+
+def plot_eeg_combined_graph(eeg_spectrogram, window_size=100):
+    """
+    Prints a single line graph for a given eeg_spectrogram, with different lines representing different channels.
+    Includes smoothing using a moving average.
+
+    Parameters:
+    eeg_spectrogram (np.ndarray): The EEG spectrogram data with shape (128, 256, 4).
+    window_size (int): The window size for the moving average smoothing.
+    """
+    colors = ["blue", "red", "green", "purple"]
+    labels = ["Channel 1", "Channel 2", "Channel 3", "Channel 4"]
+
+    fig = go.Figure()
+
+    for i in range(4):
+        smoothed_data = moving_average(eeg_spectrogram[:, :, i].flatten(), window_size)
+        fig.add_trace(
+            go.Scatter(
+                y=smoothed_data,
+                mode="lines",
+                name=labels[i],
+                line=dict(color=colors[i]),
+            )
+        )
+
+    fig.update_layout(
+        title="EEG Combined Graph", xaxis_title="Time Instances", yaxis_title="Voltage"
+    )
+    fig.show()
+
+
+def moving_average(data, window_size = 100):
+    """
+    Compute the moving average of the given data using a specified window size.
+    """
+    return np.convolve(data, np.ones(window_size) / window_size, mode="valid")

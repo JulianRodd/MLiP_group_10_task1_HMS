@@ -1,7 +1,7 @@
 # For our 
 /checkpoints/other_models
 /data
-
+/logs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
