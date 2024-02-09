@@ -16,6 +16,8 @@ class Paths:
 
     CACHE_PATH = "./data/cache/"
     TENSORBOARD = "./tensorboard/"
+    
+    LOG_PATH = "./logs/"
 
 
 class EEGConfig:
