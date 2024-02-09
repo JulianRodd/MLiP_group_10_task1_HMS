@@ -1,8 +1,8 @@
 import os
 import gc
+import random
 import numpy as np
 import pandas as pd
-from logging import getLogger
 from tqdm import tqdm
 from glob import glob
 from torch.utils.data import Dataset
@@ -12,7 +12,10 @@ from utils.data_preprocessing_utils import create_non_overlapping_eeg_crops
 from utils.eeg_processing_utils import generate_spectrogram_from_eeg
 from generics.configs import Paths, Generics, DataConfig
 from prettytable import PrettyTable
-
+from utils.general_utils import get_logger
+from utils.loader_utils import load_eeg_spectrograms, load_spectrograms
+from utils.visualisation_utils import plot_eeg_combined_graph, plot_spectrogram
+from matplotlib import pyplot as plt
 class CustomDataset(Dataset):
     """
     Custom Dataset for EEG data.
@@ -33,6 +36,7 @@ class CustomDataset(Dataset):
         subset_sample_count: int = 0,
         augment: bool = False,
         mode: str = "train",
+        cache: bool = True,
     ):
         """
         Initialize the dataset.
@@ -43,7 +47,7 @@ class CustomDataset(Dataset):
             augment (bool): Whether to apply augmentation. Default is False.
             mode (str): Operating mode ('train' or 'test'). Default is 'train'.
         """
-        self.logger = getLogger("data_loader/CustomDataset")
+        self.logger = get_logger("data_loader.log")
         self.config = config
         self.augment = augment
         self.mode = mode
@@ -53,17 +57,18 @@ class CustomDataset(Dataset):
         self.label_cols = []
 
         cache_file = self.generate_cache_filename(subset_sample_count, mode)
-        if os.path.exists(cache_file):
+        if os.path.exists(cache_file) and cache:
             self.logger.info(f"Loading dataset from cache: {cache_file}")
             self.load_from_cache(cache_file)
         else:
             self.logger.info("Processing and caching new dataset")
             self.load_data(subset_sample_count)
-            self.load_eeg_spectrograms()
-            self.load_spectrograms()
+            self.eeg_spectrograms = load_eeg_spectrograms(main_df=self.main_df, mode=self.mode)
+            self.spectrograms = load_spectrograms(main_df=self.main_df, mode=self.mode)
             if self.mode == "train" and config.ONE_CROP_PER_PERSON:
                 self.main_df = create_non_overlapping_eeg_crops(self.main_df, self.label_cols)
-            self.cache_data(cache_file)
+            if cache:
+              self.cache_data(cache_file)
 
     def generate_cache_filename(self, subset_sample_count: int, mode: str) -> str:
         """
@@ -143,66 +148,7 @@ class CustomDataset(Dataset):
             self.logger.error(f"Error loading data: {e}")
             raise
 
-    def load_eeg_spectrograms(self):
-        """
-        Load EEG spectrograms for the EEG IDs present in main_df.
-        """
-        try:
-            eeg_ids = set(self.main_df["eeg_id"])
-            csv_path = Paths.TRAIN_EEGS if self.mode == "train" else Paths.TEST_EEGS
-            paths_eegs = [
-                f
-                for f in glob(csv_path + "*.parquet")
-                if int(f.split("/")[-1].split(".")[0]) in eeg_ids
-            ]
-            self.logger.info(
-                f"Loading {len(paths_eegs)} EEGs out of {len(eeg_ids)} available in dataset"
-            )
-            eeg_spectrograms = {}
-
-            for file_path in tqdm(paths_eegs):
-                eeg_id = int(file_path.split("/")[-1].split(".")[0])
-                eeg_spectrogram = generate_spectrogram_from_eeg(file_path)
-                eeg_spectrograms[eeg_id] = eeg_spectrogram
-
-            self.eeg_spectrograms = eeg_spectrograms
-        except Exception as e:
-            self.logger.error(f"Error loading eeg_spectrograms: {e}")
-            raise
-
-    def load_spectrograms(self):
-        """
-        Load spectrogram data for the spectrogram IDs present in main_df.
-        """
-        try:
-            spectrogram_ids = set(self.main_df["spectrogram_id"])
-            paths_spectrograms = [
-                f
-                for f in glob(
-                    Paths.TRAIN_SPECTROGRAMS + "*.parquet"
-                    if self.mode == "train"
-                    else Paths.TEST_SPECTROGRAMS + "*.parquet"
-                )
-                if int(f.split("/")[-1].split(".")[0]) in spectrogram_ids
-            ]
-            self.logger.info(
-                f"Loading {len(paths_spectrograms)} spectrograms out of {len(spectrogram_ids)} available in dataset"
-            )
-
-            all_spectrograms = {}
-            for file_path in tqdm(paths_spectrograms, desc="Loading Spectrograms"):
-                spectrogram_id = int(file_path.split("/")[-1].split(".")[0])
-                aux = pd.read_parquet(file_path)
-                all_spectrograms[spectrogram_id] = aux.iloc[:, 1:].values
-                del aux
-
-            self.spectrograms = all_spectrograms
-        except FileNotFoundError as e:
-            self.logger.error(f"Spectrogram loading error: {e}")
-            raise
-        except Exception as e:
-            self.logger.error(f"Unexpected error while loading spectrograms: {e}")
-            raise
+            
 
     def __len__(self) -> int:
         """
@@ -354,3 +300,23 @@ class CustomDataset(Dataset):
           except Exception as e:
               self.logger.error(f"Error printing dataset summary: {e}")
               raise
+
+
+    def plot_samples(self, n_samples: int = 2):
+        """
+        Plots n_samples samples each from eeg_spectrograms and spectrograms with corresponding scores.
+        """
+        try:
+            # Plot 2 samples from eegs
+            eeg_sample_ids = random.sample(list(self.eeg_spectrograms.keys()), n_samples)
+            for eeg_id in eeg_sample_ids:
+                plot_eeg_combined_graph(self.eeg_spectrograms[eeg_id])
+
+            # Plot 2 samples from spectrogram_eegs
+            spectrogram_sample_ids = random.sample(list(self.spectrograms.keys()), n_samples)
+            for spectrogram_id in spectrogram_sample_ids:
+                plot_spectrogram(self.spectrograms[spectrogram_id])
+
+        except Exception as e:
+            self.logger.error(f"Error plotting samples: {e}")
+            raise

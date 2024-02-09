@@ -3,12 +3,16 @@ import os
 import random
 import time
 import numpy as np
+import os
+from logging import getLogger, INFO, StreamHandler, FileHandler, Formatter
 
 import torch
-from generics.configs import paths
+from generics.configs import Paths
+
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
+
     def __init__(self):
         self.reset()
 
@@ -29,7 +33,7 @@ def asMinutes(s: float):
     "Convert to minutes."
     m = math.floor(s / 60)
     s -= m * 60
-    return '%dm %ds' % (m, s)
+    return "%dm %ds" % (m, s)
 
 
 def timeSince(since: float, percent: float):
@@ -37,28 +41,52 @@ def timeSince(since: float, percent: float):
     s = now - since
     es = s / (percent)
     rs = es - s
-    return '%s (remain %s)' % (asMinutes(s), asMinutes(rs))
+    return "%s (remain %s)" % (asMinutes(s), asMinutes(rs))
 
 
-def get_logger(filename=paths.OUTPUT_DIR):
-    from logging import getLogger, INFO, StreamHandler, FileHandler, Formatter
+import os
+from logging import getLogger, INFO, StreamHandler, FileHandler, Formatter
+
+def get_logger(filename):
+    """
+    Creates a logger with both stream and file handlers.
+
+    Args:
+    filename (str): Path and name of the log file.
+
+    Returns:
+    logger: Configured logger object.
+    """
     logger = getLogger(__name__)
     logger.setLevel(INFO)
+
+    # Stream Handler for console output
     handler1 = StreamHandler()
-    handler1.setFormatter(Formatter("%(message)s"))
-    handler2 = FileHandler(filename=f"{filename}.log")
-    handler2.setFormatter(Formatter("%(message)s"))
+    handler1.setFormatter(Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
     logger.addHandler(handler1)
+
+    # File Handler for file output
+    log_file_path = Paths.LOG_PATH + filename + ".log"
+
+    # Create directories if they don't exist (only if a directory is specified in the path)
+    dir_name = os.path.dirname(log_file_path)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
+
+    handler2 = FileHandler(log_file_path)
+    handler2.setFormatter(Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
     logger.addHandler(handler2)
+
     return logger
-  
-  
+
+
+
 def seed_everything(seed: int):
-  random.seed(seed)
-  np.random.seed(seed)
-  torch.manual_seed(seed)
-  os.environ['PYTHONHASHSEED'] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
 
 
 def sep():
-    print("-"*100)
+    print("-" * 100)

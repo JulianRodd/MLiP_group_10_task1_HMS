@@ -1,5 +1,6 @@
 import pandas as pd
-from logging import getLogger
+
+from utils.general_utils import get_logger
 
 def create_non_overlapping_eeg_crops(df: pd.DataFrame, label_cols: list) -> pd.DataFrame:
     """
@@ -15,7 +16,7 @@ def create_non_overlapping_eeg_crops(df: pd.DataFrame, label_cols: list) -> pd.D
     Raises:
         ValueError: If the input DataFrame is empty or label_cols is not provided.
     """
-    logger = getLogger('utils/create_non_overlapping_eeg_crops')
+    logger = get_logger('data_preprocessing/create_non_overlapping_eeg_crops')
     if df.empty or not label_cols:
         logger.error("Input DataFrame is empty or label columns are not provided.")
         raise ValueError("Input DataFrame is empty or label columns are not provided.")
