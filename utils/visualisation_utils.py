@@ -1,3 +1,4 @@
+import math
 from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
@@ -76,3 +77,4 @@ def moving_average(data, window_size = 100):
     Compute the moving average of the given data using a specified window size.
     """
     return np.convolve(data, np.ones(window_size) / window_size, mode="valid")
+

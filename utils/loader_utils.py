@@ -4,11 +4,11 @@ import pandas as pd
 from tqdm import tqdm
 from glob import glob
 from utils.eeg_processing_utils import generate_spectrogram_from_eeg
-from generics.configs import Paths
+from generics import Paths
 from utils.general_utils import get_logger
 
 
-def load_eeg_spectrograms(main_df: pd.DataFrame, mode: str) -> Dict[int, np.ndarray]:
+def load_eeg_spectrograms(main_df: pd.DataFrame, mode: str, feats, use_wavelet) -> Dict[int, np.ndarray]:
     """
     Load EEG spectrograms for the EEG IDs present in the provided DataFrame.
 
@@ -36,7 +36,7 @@ def load_eeg_spectrograms(main_df: pd.DataFrame, mode: str) -> Dict[int, np.ndar
 
         for file_path in tqdm(paths_eegs):
             eeg_id = int(file_path.split("/")[-1].split(".")[0])
-            eeg_spectrogram = generate_spectrogram_from_eeg(file_path)
+            eeg_spectrogram = generate_spectrogram_from_eeg(file_path, feats, use_wavelet)
             eeg_spectrograms[eeg_id] = eeg_spectrogram
 
         return eeg_spectrograms
