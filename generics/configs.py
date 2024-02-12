@@ -41,6 +41,7 @@ class DataConfig:
         ["Fp2", "F8", "T4", "T6", "O2"],
         ["Fp2", "F4", "C4", "P4", "O2"],
     ]
+    EKG_FEAT = "EKG"
 
 
 class Generics:
