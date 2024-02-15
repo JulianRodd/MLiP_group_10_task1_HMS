@@ -56,7 +56,7 @@ def get_logger(filename):
     Returns:
     logger: Configured logger object.
     """
-    logger = getLogger(__name__)
+    logger = getLogger(filename)
     logger.setLevel(INFO)
 
     # Stream Handler for console output

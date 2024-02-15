@@ -2,9 +2,9 @@ import os
 import timm
 import torch
 import torch.nn as nn
-from generics import Generics
+from generics import Generics, Paths
 from utils.general_utils import get_logger
-
+from torch.utils.tensorboard import SummaryWriter
 
 class CustomModel(nn.Module):
     def __init__(
@@ -39,11 +39,21 @@ class CustomModel(nn.Module):
             nn.Flatten(),
             nn.Linear(self.model.num_features, num_classes),
         )
-        
-        self = self.to(self.device)
-        self.logger.info(f"{__name__} initialized.")
+        self.writer = SummaryWriter(log_dir=os.path.join(Paths.TENSORBOARD_MODELS, config.NAME))
+        self.to(self.device)
+        self.logger.info(f"{config.MODEL} initialized with config {config.NAME}")
       
-        
+
+    def log_model_parameters(self, step: int):
+        """
+        Logs the model parameters to TensorBoard.
+        """
+        for name, param in self.named_parameters():
+            self.writer.add_histogram(f"{name.replace('.', '/')}", param, step)
+            if param.grad is not None:
+                self.writer.add_histogram(f"{name.replace('.', '/')}/grad", param.grad, step)
+     
+                  
     def __reshape_input(self, x):
         """
         Reshapes input (128, 256, 8) -> (512, 512, 3) monotone image.

@@ -1,6 +1,7 @@
 import os
 import gc
 import random
+from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset
@@ -47,6 +48,7 @@ class CustomDataset(Dataset):
         """
         self.logger = get_logger("data_loader.log")
         self.config = config
+        self.writer = SummaryWriter(log_dir=os.path.join(Paths.TENSORBOARD_DATASETS, f'{config.NAME}_{mode}'))
         self.augment = augment
         self.mode = mode
         self.spectrograms = {}
@@ -74,6 +76,8 @@ class CustomDataset(Dataset):
                 self.main_df = create_non_overlapping_eeg_crops(self.main_df, self.label_cols)
             if cache:
               self.cache_data(cache_file)
+        
+        self.logger.info(f"Dataset loaded: {self.mode} mode, {len(self.main_df)} samples, with config {self.config.NAME}")
 
     def generate_cache_filename(self, subset_sample_count: int, mode: str) -> str:
         """
@@ -240,7 +244,11 @@ class CustomDataset(Dataset):
             y = np.zeros(6, dtype="float32")
             row = self.main_df.iloc[index]
 
-            r = 0 if self.mode == "test" else int((row["min"] + row["max"]) // 4)
+            if 'min' in row and 'max' in row:
+                r = int((row["min"] + row["max"]) // 4)
+            else:
+                r = 0 
+
 
             for region in range(4):
                 img = self.spectrograms[row.spectrogram_id][
@@ -288,53 +296,65 @@ class CustomDataset(Dataset):
   
   
     def print_summary(self):
-          """
-          Prints a summary of the dataset including dataset size, mode, data distribution,
-          and vote statistics if in 'train' mode.
-          """
-          try:
-              total_samples = len(self.main_df)
-              unique_patients = self.main_df['patient_id'].nunique()
-              unique_eegs = self.main_df['eeg_id'].nunique()
-              unique_spectrograms = self.main_df['spectrogram_id'].nunique()
+        """
+        Prints and logs a summary of the dataset including dataset size, mode, data distribution,
+        and vote statistics if in 'train' mode, to both the console and TensorBoard.
+        """
+        try:
+            total_samples = len(self.main_df)
+            unique_patients = self.main_df['patient_id'].nunique()
+            unique_eegs = self.main_df['eeg_id'].nunique()
+            unique_spectrograms = self.main_df['spectrogram_id'].nunique()
 
-              print(f"Dataset Summary:")
-              print(f"Mode: {self.mode}")
-              print(f"Total Samples: {total_samples}")
-              print(f"Unique Patients: {unique_patients}")
-              print(f"Unique EEGs: {unique_eegs}")
-              print(f"Unique Spectrograms: {unique_spectrograms}")
+            summary_str = f"Dataset Summary:\n"
+            summary_str += f"Mode: {self.mode}\n"
+            summary_str += f"Total Samples: {total_samples}\n"
+            summary_str += f"Unique Patients: {unique_patients}\n"
+            summary_str += f"Unique EEGs: {unique_eegs}\n"
+            summary_str += f"Unique Spectrograms: {unique_spectrograms}\n"
 
-              if self.mode == "train":
-                  print(f"Augmentation: {'Enabled' if self.augment else 'Disabled'}")
-                  label_distribution = self.main_df[self.label_cols].sum()
-                  print(f"Label Distribution:\n{label_distribution}")
+            self.writer.add_text("Dataset/Summary", summary_str, 0)
 
-                  # Vote statistics
-                  vote_cols = ['seizure_vote', 'lpd_vote', 'gpd_vote', 'lrda_vote', 'grda_vote', 'other_vote']
-                  vote_stats = self.main_df[vote_cols].agg(['mean', 'var'])
-                  print("\nVote Statistics:")
-                  print(vote_stats)
+            if self.mode == "train":
+                augmentation_status = 'Enabled' if self.augment else 'Disabled'
+                summary_str += f"Augmentation: {augmentation_status}\n"
 
-              print(f"Spectrograms Loaded: {len(self.spectrograms)}")
-              print(f"EEG Spectrograms Loaded: {len(self.eeg_spectrograms)}")
-              
-              
-              # Configuration summary
-              config_table = PrettyTable()
-              config_table.field_names = ["Configuration", "Value"]
-              config_table.align = "l"
-              for attr in dir(self.config):
-                  if not attr.startswith("__") and not callable(getattr(self.config, attr)):
-                      value = getattr(self.config, attr)
-                      config_table.add_row([attr, value])
+                label_distribution = self.main_df[self.label_cols].sum()
+                summary_str += f"Label Distribution:\n{label_distribution}\n"
 
-              print("\nConfiguration Summary:")
-              print(config_table)
+                # Convert pandas Series to numpy array before logging to TensorBoard
+                label_distribution_np = label_distribution.values
+                self.writer.add_histogram("Dataset/Label_Distribution", label_distribution_np, 0)
 
-          except Exception as e:
-              self.logger.error(f"Error printing dataset summary: {e}")
-              raise
+
+                vote_cols = ['seizure_vote', 'lpd_vote', 'gpd_vote', 'lrda_vote', 'grda_vote', 'other_vote']
+                vote_stats = self.main_df[vote_cols].agg(['mean', 'var'])
+                summary_str += f"\nVote Statistics:\n{vote_stats}\n"
+                for col in vote_cols:
+                    self.writer.add_scalars(f"Dataset/Vote_Stats/{col}", {"mean": vote_stats.loc["mean", col], "var": vote_stats.loc["var", col]}, 0)
+
+            summary_str += f"Spectrograms Loaded: {len(self.spectrograms)}\n"
+            summary_str += f"EEG Spectrograms Loaded: {len(self.eeg_spectrograms)}\n"
+
+            # Configuration summary
+            config_table = PrettyTable()
+            config_table.field_names = ["Configuration", "Value"]
+            config_table.align = "l"
+            for attr in dir(self.config):
+                if not attr.startswith("__") and not callable(getattr(self.config, attr)):
+                    value = getattr(self.config, attr)
+                    config_table.add_row([attr, value])
+                    self.writer.add_text(f"Configuration/{attr}", str(value), 0)
+
+            summary_str += "\nConfiguration Summary:\n"
+            summary_str += config_table.get_string()
+
+            print(summary_str)
+            self.writer.add_text("Dataset/Configuration_Summary", config_table.get_html_string(), 0)
+
+        except Exception as e:
+            self.logger.error(f"Error printing and logging dataset summary: {e}")
+            raise
 
 
     def plot_samples(self, n_samples: int = 2):
@@ -355,3 +375,10 @@ class CustomDataset(Dataset):
         except Exception as e:
             self.logger.error(f"Error plotting samples: {e}")
             raise
+
+
+    def __del__(self):
+        """
+        Destructor to close TensorBoard writer.
+        """
+        self.writer.close()

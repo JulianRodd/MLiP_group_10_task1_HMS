@@ -20,9 +20,12 @@ class Paths:
 
     OTHER_MODEL_CHECKPOINTS = "./checkpoints/other_models/"
     BEST_MODEL_CHECKPOINTS = "./checkpoints/best_models/"
-
     CACHE_PATH = "./data/cache/"
     TENSORBOARD = "./tensorboard/"
+    TENSORBOARD_MODELS = "./tensorboard/models/"
+    TENSORBOARD_TRAINING = "./tensorboard/training/"
+    TENSORBOARD_DATASETS = "./tensorboard/datasets/"
+    TENSORBOARD_INFERENCE = "./tensorboard/inference/"
 
     LOG_PATH = "./logs/"
 
@@ -39,6 +42,7 @@ class Generics:
         "grda_vote",
         "other_vote",
     ]
+    TARGET_PREDS = [x + "_pred" for x in LABEL_COLS]
     DEVICE = (
         "cuda"
         if torch.cuda.is_available()

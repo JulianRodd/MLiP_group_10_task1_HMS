@@ -22,7 +22,7 @@ def load_eeg_spectrograms(main_df: pd.DataFrame, mode: str, feats, use_wavelet) 
     logger = get_logger("eeg_spectrogram_loader.log")
     try:
         eeg_ids = set(main_df["eeg_id"])
-        csv_path = Paths.TRAIN_EEGS if mode == "train" else Paths.TEST_EEGS
+        csv_path = Paths.TEST_EEGS if mode == "test" else Paths.TRAIN_EEGS
         paths_eegs = [
             f
             for f in glob(csv_path + "*.parquet")
@@ -61,7 +61,7 @@ def load_spectrograms(main_df: pd.DataFrame, mode: str) -> Dict[int, np.ndarray]
     try:
         spectrogram_ids = set(main_df["spectrogram_id"])
         paths_spectrograms = [
-            f for f in glob(Paths.TRAIN_SPECTROGRAMS + "*.parquet" if mode == "train" else Paths.TEST_SPECTROGRAMS + "*.parquet")
+            f for f in glob(Paths.TEST_SPECTROGRAMS + "*.parquet" if mode == "test" else Paths.TRAIN_SPECTROGRAMS + "*.parquet")
             if int(f.split("/")[-1].split(".")[0]) in spectrogram_ids
         ]
         
