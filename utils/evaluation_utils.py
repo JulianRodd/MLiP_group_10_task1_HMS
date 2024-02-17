@@ -42,7 +42,6 @@ def score_kl_divergence(
         solution: pd.DataFrame,
         submission: pd.DataFrame,
         row_id_column_name: str,
-        # verify_valid_probabilities: function,
         epsilon: float=10**-15,
         micro_average: bool=True,
         sample_weights_column_name: Optional[str]=None
@@ -77,8 +76,9 @@ def score_kl_divergence(
     >>> score(solution, submission, 'id')
     0.160531...
     '''
-    del solution[row_id_column_name]
-    del submission[row_id_column_name]
+    if row_id_column_name is not None:
+        del solution[row_id_column_name]
+        del submission[row_id_column_name]
 
     sample_weights = None
     if sample_weights_column_name:

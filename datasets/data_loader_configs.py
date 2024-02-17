@@ -18,6 +18,7 @@ class BaseDataConfig:
     ]
     VAL_SPLIT_RATIO = 0.2
     SUBSET_SAMPLE_COUNT: int = 0
+    EKG_FEAT = "EKG"
 
 
 # Extend BaseConfig to change or dataset configuration

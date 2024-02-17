@@ -7,7 +7,8 @@ import pandas as pd
 import numpy as np
 from prettytable import PrettyTable
 
-from generics.configs import DataConfig, Paths, Generics
+from generics import Paths, Generics
+from datasets.data_loader_configs import BaseDataConfig
 from utils.general_utils import get_logger
 
 
@@ -27,7 +28,7 @@ class CustomRawDataset():
 
     def __init__(
         self,
-        config: DataConfig,
+        config: BaseDataConfig,
         subset_sample_count: int = 0,
         mode: str = "train",
         cache: bool = True,
@@ -69,7 +70,7 @@ class CustomRawDataset():
     
     def load_x_y(self, feature_func: Callable, feature_func_kwargs: dict = {}):
         eeg_ids = np.asarray(self.main_df["eeg_id"])
-        eeg_paths = glob(f"{Paths.TRAIN_EEGS}*.parquet")
+        eeg_paths = glob(f"{Paths.TRAIN_EEGS if self.mode=='train' else Paths.TEST_EEGS}*.parquet")
 
         eegs = self.load_eegs_from_parquet(eeg_paths, eeg_ids)
 
@@ -82,25 +83,30 @@ class CustomRawDataset():
         expert_lbls = np.zeros((len(self.main_df), 6))
         subsample_eeg_ids = np.zeros(len(self.main_df))
         
-        sample_eeg = pd.read_parquet(f"{Paths.TRAIN_EEGS}{eeg_ids[0]}.parquet").iloc[:5]
+        sample_eeg = pd.read_parquet(f"{Paths.TRAIN_EEGS if self.mode=='train' else Paths.TEST_EEGS}{eeg_ids[0]}.parquet").iloc[:5]
         features_per_sample = np.zeros(((len(self.main_df), len(feature_func(sample_eeg, channels, one_hot_df, **feature_func_kwargs)))))
         
         subsamples_added = 0
+
         for i, (eeg_id, eeg) in tqdm(enumerate(eegs)):
             eeg = self.cleanup_nans(eeg)
             if eeg_id in list(self.main_df["eeg_id"]):
                 subsamples = self.main_df[self.main_df["eeg_id"] == eeg_id]
-                for j, (df_i, subsample) in enumerate(subsamples.iterrows()):
-                    subsample_eeg = eeg.iloc[
-                        int(subsample["eeg_label_offset_seconds"] * 200) :
-                        int(subsample["eeg_label_offset_seconds"] * 200 + (10 * 200))
-                    ]
-                    if self.mode == "train":
+                if self.mode == "train":
+                    for j, (df_i, subsample) in enumerate(subsamples.iterrows()):
+                        subsample_eeg = eeg.iloc[
+                            int(subsample["eeg_label_offset_seconds"] * 200) :
+                            int(subsample["eeg_label_offset_seconds"] * 200 + (50 * 200))
+                        ]
                         expert_lbls[subsamples_added + j -1] = np.asarray(subsample[self.label_cols])
-                    subsample_eeg_ids[subsamples_added + j -1] = subsample["eeg_sub_id"]
-                    features_per_sample[subsamples_added + j -1] = feature_func(subsample_eeg, channels, one_hot_df, **feature_func_kwargs)
+                        subsample_eeg_ids[subsamples_added + j -1] = subsample["eeg_sub_id"]
+                        features_per_sample[subsamples_added + j -1] = feature_func(subsample_eeg, channels, one_hot_df, **feature_func_kwargs)
+                    subsamples_added += len(subsamples)
+                else:
+                    features_per_sample[i] = feature_func(eeg, channels, one_hot_df, **feature_func_kwargs)
 
-                subsamples_added += len(subsamples)
+        if self.mode == "test":
+            assert i + 1 == len(self.main_df), f"Expected the number of eegs in main_df to be equal to the amount of eegs in {Paths.TEST_EEGS}"
         
         self.features_per_sample = features_per_sample # x
         self.lbl_probabilities = expert_lbls / np.sum(expert_lbls, axis=1)[:,None] # y
