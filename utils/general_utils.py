@@ -5,9 +5,8 @@ import time
 import numpy as np
 import os
 from logging import getLogger, INFO, StreamHandler, FileHandler, Formatter
-
 import torch
-from generics.configs import Paths
+from generics import Paths
 
 
 class AverageMeter(object):
@@ -57,7 +56,7 @@ def get_logger(filename):
     Returns:
     logger: Configured logger object.
     """
-    logger = getLogger(__name__)
+    logger = getLogger(filename)
     logger.setLevel(INFO)
 
     # Stream Handler for console output

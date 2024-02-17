@@ -1,8 +1,8 @@
 # For our 
-/checkpoints/other_models
+/checkpoints
 /data
 /logs
-
+/tensorboard
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

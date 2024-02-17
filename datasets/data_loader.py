@@ -1,21 +1,21 @@
 import os
 import gc
 import random
+from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
-from glob import glob
 from torch.utils.data import Dataset
 import torch
 import albumentations as A
 from utils.data_preprocessing_utils import create_non_overlapping_eeg_crops
-from utils.eeg_processing_utils import generate_spectrogram_from_eeg
-from generics.configs import Paths, Generics, DataConfig
+from generics import Paths, Generics
 from prettytable import PrettyTable
 from utils.general_utils import get_logger
 from utils.loader_utils import load_eeg_spectrograms, load_spectrograms
 from utils.visualisation_utils import plot_eeg_combined_graph, plot_spectrogram
-from matplotlib import pyplot as plt
+from torch.utils.data import DataLoader, Dataset
+from sklearn.model_selection import train_test_split
+
 class CustomDataset(Dataset):
     """
     Custom Dataset for EEG data.
@@ -32,8 +32,7 @@ class CustomDataset(Dataset):
 
     def __init__(
         self,
-        config: DataConfig,
-        subset_sample_count: int = 0,
+        config,
         augment: bool = False,
         mode: str = "train",
         cache: bool = True,
@@ -49,26 +48,36 @@ class CustomDataset(Dataset):
         """
         self.logger = get_logger("data_loader.log")
         self.config = config
+        self.writer = SummaryWriter(log_dir=os.path.join(Paths.TENSORBOARD_DATASETS, f'{config.NAME}_{mode}'))
         self.augment = augment
         self.mode = mode
         self.spectrograms = {}
         self.eeg_spectrograms = {}
         self.main_df = pd.DataFrame()
         self.label_cols = []
+        
+        if mode == "test":
+            self.batch_size = config.BATCH_SIZE_TEST
+        elif mode == "val":
+            self.batch_size = config.BATCH_SIZE_VAL
+        else:
+            self.batch_size = config.BATCH_SIZE_TRAIN
 
-        cache_file = self.generate_cache_filename(subset_sample_count, mode)
+        cache_file = self.generate_cache_filename(self.config.SUBSET_SAMPLE_COUNT, mode)
         if os.path.exists(cache_file) and cache:
             self.logger.info(f"Loading dataset from cache: {cache_file}")
             self.load_from_cache(cache_file)
         else:
             self.logger.info("Processing and caching new dataset")
-            self.load_data(subset_sample_count)
-            self.eeg_spectrograms = load_eeg_spectrograms(main_df=self.main_df, mode=self.mode)
+            self.load_data(self.config.SUBSET_SAMPLE_COUNT)
+            self.eeg_spectrograms = load_eeg_spectrograms(main_df=self.main_df, mode=self.mode, feats = self.config.FEATS, use_wavelet=self.config.USE_WAVELET)
             self.spectrograms = load_spectrograms(main_df=self.main_df, mode=self.mode)
             if self.mode == "train" and config.ONE_CROP_PER_PERSON:
                 self.main_df = create_non_overlapping_eeg_crops(self.main_df, self.label_cols)
             if cache:
               self.cache_data(cache_file)
+        
+        self.logger.info(f"Dataset loaded: {self.mode} mode, {len(self.main_df)} samples, with config {self.config.NAME}")
 
     def generate_cache_filename(self, subset_sample_count: int, mode: str) -> str:
         """
@@ -81,7 +90,7 @@ class CustomDataset(Dataset):
         Returns:
             str: Filename for caching the dataset.
         """
-        config_summary = f"CustomDataset_{subset_sample_count}_{mode}"
+        config_summary = f"CustomDataset_{subset_sample_count}_{mode}_{self.config.ONE_CROP_PER_PERSON}"
         return os.path.join(Paths.CACHE_PATH, f"{config_summary}.npz")
 
     def cache_data(self, cache_file: str):
@@ -108,7 +117,8 @@ class CustomDataset(Dataset):
         self.main_df = pd.DataFrame.from_records(cached_data['main_df'])
         self.spectrograms = cached_data['spectrograms'].item()
         self.eeg_spectrograms = cached_data['eeg_spectrograms'].item()
-        self.label_cols = self.main_df.columns[-6:].tolist()
+        self.label_cols = Generics.LABEL_COLS
+
 
     def load_data(self, subset_sample_count: int = 0):
         """
@@ -119,7 +129,7 @@ class CustomDataset(Dataset):
             subset_sample_count (int): Number of unique samples to load based on 'patient_id'. Default is 0 (load all samples).
         """
         try:
-            csv_path = Paths.TRAIN_CSV if self.mode == "train" else Paths.TEST_CSV
+            csv_path = Paths.TEST_CSV if self.mode == "test" else Paths.TRAIN_CSV
             main_df = pd.read_csv(csv_path)
             main_df = main_df[~main_df["eeg_id"].isin(Generics.OPT_OUT_EEG_ID)]
             self.label_cols = main_df.columns[-6:].tolist()
@@ -137,9 +147,14 @@ class CustomDataset(Dataset):
                 if subset_sample_count < unique_patients:
                     sampled_df = sampled_df.sample(n=subset_sample_count, random_state=42).reset_index(drop=True)
 
-                self.main_df = sampled_df
-            else:
-                self.main_df = main_df
+                main_df = sampled_df
+
+            if self.mode == 'val':
+                _, main_df = train_test_split(main_df, test_size=self.config.VAL_SPLIT_RATIO, random_state=42)
+            elif self.mode == 'train':
+                main_df, _ = train_test_split(main_df, test_size=self.config.VAL_SPLIT_RATIO, random_state=42)
+
+            self.main_df = main_df
 
             self.logger.info(f"{self.mode} DataFrame shape: {self.main_df.shape}")
             self.logger.info(f"Labels: {self.label_cols}")
@@ -148,6 +163,30 @@ class CustomDataset(Dataset):
             self.logger.error(f"Error loading data: {e}")
             raise
 
+    
+    def get_torch_data_loader(self):
+        """
+        Get the torch data loader for the dataset.
+
+        Args:
+            config (DataConfig): Configuration for the dataset.
+
+        Returns:
+            DataLoader: Data loader for the dataset.
+        """
+        try:
+            return DataLoader(
+                self,
+                batch_size=self.batch_size,
+                shuffle=self.config.SHUFFLE_TRAIN,
+                num_workers=self.config.NUM_WORKERS,
+                pin_memory=self.config.PIN_MEMORY,
+                drop_last=self.config.DROP_LAST,
+            )
+        except Exception as e:
+            self.logger.error(f"Error getting data loader: {e}")
+            raise
+      
             
 
     def __len__(self) -> int:
@@ -205,7 +244,11 @@ class CustomDataset(Dataset):
             y = np.zeros(6, dtype="float32")
             row = self.main_df.iloc[index]
 
-            r = 0 if self.mode == "test" else int((row["min"] + row["max"]) // 4)
+            if 'min' in row and 'max' in row:
+                r = int((row["min"] + row["max"]) // 4)
+            else:
+                r = 0 
+
 
             for region in range(4):
                 img = self.spectrograms[row.spectrogram_id][
@@ -253,53 +296,65 @@ class CustomDataset(Dataset):
   
   
     def print_summary(self):
-          """
-          Prints a summary of the dataset including dataset size, mode, data distribution,
-          and vote statistics if in 'train' mode.
-          """
-          try:
-              total_samples = len(self.main_df)
-              unique_patients = self.main_df['patient_id'].nunique()
-              unique_eegs = self.main_df['eeg_id'].nunique()
-              unique_spectrograms = self.main_df['spectrogram_id'].nunique()
+        """
+        Prints and logs a summary of the dataset including dataset size, mode, data distribution,
+        and vote statistics if in 'train' mode, to both the console and TensorBoard.
+        """
+        try:
+            total_samples = len(self.main_df)
+            unique_patients = self.main_df['patient_id'].nunique()
+            unique_eegs = self.main_df['eeg_id'].nunique()
+            unique_spectrograms = self.main_df['spectrogram_id'].nunique()
 
-              print(f"Dataset Summary:")
-              print(f"Mode: {self.mode}")
-              print(f"Total Samples: {total_samples}")
-              print(f"Unique Patients: {unique_patients}")
-              print(f"Unique EEGs: {unique_eegs}")
-              print(f"Unique Spectrograms: {unique_spectrograms}")
+            summary_str = f"Dataset Summary:\n"
+            summary_str += f"Mode: {self.mode}\n"
+            summary_str += f"Total Samples: {total_samples}\n"
+            summary_str += f"Unique Patients: {unique_patients}\n"
+            summary_str += f"Unique EEGs: {unique_eegs}\n"
+            summary_str += f"Unique Spectrograms: {unique_spectrograms}\n"
 
-              if self.mode == "train":
-                  print(f"Augmentation: {'Enabled' if self.augment else 'Disabled'}")
-                  label_distribution = self.main_df[self.label_cols].sum()
-                  print(f"Label Distribution:\n{label_distribution}")
+            self.writer.add_text("Dataset/Summary", summary_str, 0)
 
-                  # Vote statistics
-                  vote_cols = ['seizure_vote', 'lpd_vote', 'gpd_vote', 'lrda_vote', 'grda_vote', 'other_vote']
-                  vote_stats = self.main_df[vote_cols].agg(['mean', 'median', 'var'])
-                  print("\nVote Statistics:")
-                  print(vote_stats)
+            if self.mode == "train":
+                augmentation_status = 'Enabled' if self.augment else 'Disabled'
+                summary_str += f"Augmentation: {augmentation_status}\n"
 
-              print(f"Spectrograms Loaded: {len(self.spectrograms)}")
-              print(f"EEG Spectrograms Loaded: {len(self.eeg_spectrograms)}")
-              
-              
-              # Configuration summary
-              config_table = PrettyTable()
-              config_table.field_names = ["Configuration", "Value"]
-              config_table.align = "l"
-              for attr in dir(self.config):
-                  if not attr.startswith("__") and not callable(getattr(self.config, attr)):
-                      value = getattr(self.config, attr)
-                      config_table.add_row([attr, value])
+                label_distribution = self.main_df[self.label_cols].sum()
+                summary_str += f"Label Distribution:\n{label_distribution}\n"
 
-              print("\nConfiguration Summary:")
-              print(config_table)
+                # Convert pandas Series to numpy array before logging to TensorBoard
+                label_distribution_np = label_distribution.values
+                self.writer.add_histogram("Dataset/Label_Distribution", label_distribution_np, 0)
 
-          except Exception as e:
-              self.logger.error(f"Error printing dataset summary: {e}")
-              raise
+
+                vote_cols = ['seizure_vote', 'lpd_vote', 'gpd_vote', 'lrda_vote', 'grda_vote', 'other_vote']
+                vote_stats = self.main_df[vote_cols].agg(['mean', 'var'])
+                summary_str += f"\nVote Statistics:\n{vote_stats}\n"
+                for col in vote_cols:
+                    self.writer.add_scalars(f"Dataset/Vote_Stats/{col}", {"mean": vote_stats.loc["mean", col], "var": vote_stats.loc["var", col]}, 0)
+
+            summary_str += f"Spectrograms Loaded: {len(self.spectrograms)}\n"
+            summary_str += f"EEG Spectrograms Loaded: {len(self.eeg_spectrograms)}\n"
+
+            # Configuration summary
+            config_table = PrettyTable()
+            config_table.field_names = ["Configuration", "Value"]
+            config_table.align = "l"
+            for attr in dir(self.config):
+                if not attr.startswith("__") and not callable(getattr(self.config, attr)):
+                    value = getattr(self.config, attr)
+                    config_table.add_row([attr, value])
+                    self.writer.add_text(f"Configuration/{attr}", str(value), 0)
+
+            summary_str += "\nConfiguration Summary:\n"
+            summary_str += config_table.get_string()
+
+            print(summary_str)
+            self.writer.add_text("Dataset/Configuration_Summary", config_table.get_html_string(), 0)
+
+        except Exception as e:
+            self.logger.error(f"Error printing and logging dataset summary: {e}")
+            raise
 
 
     def plot_samples(self, n_samples: int = 2):
@@ -320,3 +375,10 @@ class CustomDataset(Dataset):
         except Exception as e:
             self.logger.error(f"Error plotting samples: {e}")
             raise
+
+
+    def __del__(self):
+        """
+        Destructor to close TensorBoard writer.
+        """
+        self.writer.close()
