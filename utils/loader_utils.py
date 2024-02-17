@@ -4,11 +4,11 @@ import pandas as pd
 from tqdm import tqdm
 from glob import glob
 from utils.eeg_processing_utils import generate_spectrogram_from_eeg
-from generics.configs import Paths
+from generics import Paths
 from utils.general_utils import get_logger
 
 
-def load_eeg_spectrograms(main_df: pd.DataFrame, mode: str) -> Dict[int, np.ndarray]:
+def load_eeg_spectrograms(main_df: pd.DataFrame, mode: str, feats, use_wavelet) -> Dict[int, np.ndarray]:
     """
     Load EEG spectrograms for the EEG IDs present in the provided DataFrame.
 
@@ -22,7 +22,7 @@ def load_eeg_spectrograms(main_df: pd.DataFrame, mode: str) -> Dict[int, np.ndar
     logger = get_logger("eeg_spectrogram_loader.log")
     try:
         eeg_ids = set(main_df["eeg_id"])
-        csv_path = Paths.TRAIN_EEGS if mode == "train" else Paths.TEST_EEGS
+        csv_path = Paths.TEST_EEGS if mode == "test" else Paths.TRAIN_EEGS
         paths_eegs = [
             f
             for f in glob(csv_path + "*.parquet")
@@ -36,7 +36,7 @@ def load_eeg_spectrograms(main_df: pd.DataFrame, mode: str) -> Dict[int, np.ndar
 
         for file_path in tqdm(paths_eegs):
             eeg_id = int(file_path.split("/")[-1].split(".")[0])
-            eeg_spectrogram = generate_spectrogram_from_eeg(file_path)
+            eeg_spectrogram = generate_spectrogram_from_eeg(file_path, feats, use_wavelet)
             eeg_spectrograms[eeg_id] = eeg_spectrogram
 
         return eeg_spectrograms
@@ -61,7 +61,7 @@ def load_spectrograms(main_df: pd.DataFrame, mode: str) -> Dict[int, np.ndarray]
     try:
         spectrogram_ids = set(main_df["spectrogram_id"])
         paths_spectrograms = [
-            f for f in glob(Paths.TRAIN_SPECTROGRAMS + "*.parquet" if mode == "train" else Paths.TEST_SPECTROGRAMS + "*.parquet")
+            f for f in glob(Paths.TEST_SPECTROGRAMS + "*.parquet" if mode == "test" else Paths.TRAIN_SPECTROGRAMS + "*.parquet")
             if int(f.split("/")[-1].split(".")[0]) in spectrogram_ids
         ]
         
