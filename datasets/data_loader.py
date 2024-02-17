@@ -33,6 +33,7 @@ class CustomDataset(Dataset):
     def __init__(
         self,
         config,
+        paths: Paths,
         augment: bool = False,
         mode: str = "train",
         cache: bool = True,
@@ -48,7 +49,8 @@ class CustomDataset(Dataset):
         """
         self.logger = get_logger("data_loader.log")
         self.config = config
-        self.writer = SummaryWriter(log_dir=os.path.join(Paths.TENSORBOARD_DATASETS, f'{config.NAME}_{mode}'))
+        self.paths = paths
+        self.writer = SummaryWriter(log_dir=os.path.join(self.paths.TENSORBOARD_DATASETS, f'{config.NAME}_{mode}'))
         self.augment = augment
         self.mode = mode
         self.spectrograms = {}
@@ -91,7 +93,7 @@ class CustomDataset(Dataset):
             str: Filename for caching the dataset.
         """
         config_summary = f"CustomDataset_{subset_sample_count}_{mode}_{self.config.ONE_CROP_PER_PERSON}"
-        return os.path.join(Paths.CACHE_PATH, f"{config_summary}.npz")
+        return os.path.join(self.paths.CACHE_PATH, f"{config_summary}.npz")
 
     def cache_data(self, cache_file: str):
         """
@@ -129,7 +131,7 @@ class CustomDataset(Dataset):
             subset_sample_count (int): Number of unique samples to load based on 'patient_id'. Default is 0 (load all samples).
         """
         try:
-            csv_path = Paths.TEST_CSV if self.mode == "test" else Paths.TRAIN_CSV
+            csv_path = self.paths.TEST_CSV if self.mode == "test" else self.paths.TRAIN_CSV
             main_df = pd.read_csv(csv_path)
             main_df = main_df[~main_df["eeg_id"].isin(Generics.OPT_OUT_EEG_ID)]
             self.label_cols = main_df.columns[-6:].tolist()

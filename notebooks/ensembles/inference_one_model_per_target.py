@@ -1,4 +1,6 @@
 import os
+os.chdir("/home/janneke/Documents/Master/Machine_Learning_in_Practice/HMS/MLiP_group_10_task1_HMS/")
+
 from copy import deepcopy
 
 import pandas as pd
@@ -9,23 +11,22 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import GradientBoostingRegressor
 
 from datasets.raw_data_loader import CustomRawDataset
-from generics.configs import DataConfig
+from datasets.data_loader_configs import BaseDataConfig
 from utils.evaluation_utils import score_kl_divergence
 
 
-os.chdir("/home/janneke/Documents/Master/Machine_Learning_in_Practice/HMS/MLiP_group_10_task1_HMS/")
 
 basicConfig(level=INFO)
 logger = getLogger('main')
-config = DataConfig()
+config = BaseDataConfig()
 
+train_subset_sample_count = 100
 dataset = CustomRawDataset(config, mode="test", cache=True)
 dataset.print_summary()
 
-# dataset.features_per_sample
+dataset.features_per_sample
 
-with open("ensemble_one_model_per_target.pickle", "rb") as pickle_file:
-	models = pickle.load(pickle_file)
+
 
 # y_pred = np.zeros(y_test.shape)
 	

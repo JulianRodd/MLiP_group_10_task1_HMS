@@ -29,6 +29,7 @@ class CustomRawDataset():
     def __init__(
         self,
         config: BaseDataConfig,
+        paths: Paths = Paths(),
         subset_sample_count: int = 0,
         mode: str = "train",
         cache: bool = True,
@@ -46,6 +47,7 @@ class CustomRawDataset():
         """
         self.logger = get_logger("data_loader.log")
         self.config = config
+        self.paths = paths
         self.mode = mode
         self.main_df = pd.DataFrame()
         self.label_cols = []
@@ -70,7 +72,7 @@ class CustomRawDataset():
     
     def load_x_y(self, feature_func: Callable, feature_func_kwargs: dict = {}):
         eeg_ids = np.asarray(self.main_df["eeg_id"])
-        eeg_paths = glob(f"{Paths.TRAIN_EEGS if self.mode=='train' else Paths.TEST_EEGS}*.parquet")
+        eeg_paths = glob(f"{self.paths.TRAIN_EEGS if self.mode=='train' else self.paths.TEST_EEGS}*.parquet")
 
         eegs = self.load_eegs_from_parquet(eeg_paths, eeg_ids)
 
@@ -83,7 +85,7 @@ class CustomRawDataset():
         expert_lbls = np.zeros((len(self.main_df), 6))
         subsample_eeg_ids = np.zeros(len(self.main_df))
         
-        sample_eeg = pd.read_parquet(f"{Paths.TRAIN_EEGS if self.mode=='train' else Paths.TEST_EEGS}{eeg_ids[0]}.parquet").iloc[:5]
+        sample_eeg = pd.read_parquet(f"{self.paths.TRAIN_EEGS if self.mode=='train' else self.paths.TEST_EEGS}{eeg_ids[0]}.parquet").iloc[:5]
         features_per_sample = np.zeros(((len(self.main_df), len(feature_func(sample_eeg, channels, one_hot_df, **feature_func_kwargs)))))
         
         subsamples_added = 0
@@ -106,7 +108,7 @@ class CustomRawDataset():
                     features_per_sample[i] = feature_func(eeg, channels, one_hot_df, **feature_func_kwargs)
 
         if self.mode == "test":
-            assert i + 1 == len(self.main_df), f"Expected the number of eegs in main_df to be equal to the amount of eegs in {Paths.TEST_EEGS}"
+            assert i + 1 == len(self.main_df), f"Expected the number of eegs in main_df to be equal to the amount of eegs in {self.paths.TEST_EEGS}"
         
         self.features_per_sample = features_per_sample # x
         self.lbl_probabilities = expert_lbls / np.sum(expert_lbls, axis=1)[:,None] # y
@@ -160,7 +162,7 @@ class CustomRawDataset():
             str: Filename for caching the dataset.
         """
         config_summary = f"CustomRawDataset_{subset_sample_count}_{mode}"
-        return os.path.join(Paths.CACHE_PATH, f"{config_summary}.npz")
+        return os.path.join(self.paths.CACHE_PATH, f"{config_summary}.npz")
 
     def cache_data(self, cache_file: str):
         """
@@ -199,7 +201,7 @@ class CustomRawDataset():
             subset_sample_count (int): Number of unique samples to load based on 'patient_id'. Default is 0 (load all samples).
         """
         try:
-            csv_path = Paths.TRAIN_CSV if self.mode == "train" else Paths.TEST_CSV
+            csv_path = self.paths.TRAIN_CSV if self.mode == "train" else self.paths.TEST_CSV
             main_df = pd.read_csv(csv_path)
             main_df = main_df[~main_df["eeg_id"].isin(Generics.OPT_OUT_EEG_ID)]
             self.label_cols = main_df.columns[-6:].tolist()
