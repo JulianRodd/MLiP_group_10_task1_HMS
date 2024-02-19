@@ -1,6 +1,7 @@
 import pandas as pd
 from logging import getLogger
 
+
 def create_non_overlapping_eeg_crops(df: pd.DataFrame, label_cols: list) -> pd.DataFrame:
     """
     Preprocesses the EEG dataset to create a non-overlapping crop for each person.
