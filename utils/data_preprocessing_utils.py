@@ -54,7 +54,7 @@ def create_non_overlapping_eeg_crops(df: pd.DataFrame, label_cols: list) -> pd.D
 
 def filter_by_agreement(df:pd.DataFrame, min:float):
     '''
-    Takes train/test.csv
+    Takes train/test df
     Returns df with rows having more than min agreement (min in %). 
     '''
     
@@ -63,6 +63,19 @@ def filter_by_agreement(df:pd.DataFrame, min:float):
     total_votes = df[vote_cols].sum(axis=1)
     min /= 100
     bool_filter = (max_votes/total_votes)>min
+
+    return df[bool_filter]
+
+
+def filter_by_annotators(df:pd.DataFrame, min:int):
+    '''
+    Takes train/test df
+    Returns df with rows having more than min number of annotators
+    '''
+    
+    vote_cols = ['seizure_vote','lpd_vote', 'gpd_vote', 'lrda_vote','grda_vote','other_vote']
+    total_votes = df[vote_cols].sum(axis=1)
+    bool_filter = total_votes>min
 
     return df[bool_filter]
 
