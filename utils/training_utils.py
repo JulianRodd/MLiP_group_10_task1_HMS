@@ -60,9 +60,11 @@ def train_loop(
 ):
     preds = []
     actual = []
+    total_epochs = model.config.EPOCHS
+
     tb_run_path = os.path.join(
         Paths.TENSORBOARD_TRAINING,
-        f"{train_dataset.config.NAME}_{model.config.NAME}_fold_{fold}",
+        f"{train_dataset.config.NAME}_{model.config.NAME}",
     )
     writer = SummaryWriter(tb_run_path)
     try:
@@ -88,8 +90,10 @@ def train_loop(
             )
             avg_val_loss = _valid_epoch(val_loader, model, criterion, model.device)
 
-            writer.add_scalar("Loss/Train", avg_train_loss, epoch)
-            writer.add_scalar("Loss/Validation", avg_val_loss, epoch)
+
+            # Log the losses with the combined index
+            writer.add_scalar("Loss/Train", avg_train_loss)
+            writer.add_scalar("Loss/Validation", avg_val_loss)
 
             # Save checkpoint after each epoch with fold information
             checkpoint_name = f"{model_config.MODEL}_{model_config.NAME}_{train_dataset.config.NAME}_fold_{fold}_epoch_{epoch+1}_loss_{avg_val_loss:.4f}.pth"

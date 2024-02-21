@@ -11,11 +11,12 @@ from utils.data_preprocessing_utils import create_non_overlapping_eeg_crops
 from generics import Paths, Generics
 from prettytable import PrettyTable
 from utils.general_utils import get_logger
-from utils.loader_utils import load_eeg_spectrograms, load_spectrograms
+from utils.loader_utils import load_eeg_spectrograms, load_spectrograms, load_preloaded_eeg_spectrograms, load_preloaded_spectrograms, normalize_eeg_spectrograms
 from utils.visualisation_utils import plot_eeg_combined_graph, plot_spectrogram
 from torch.utils.data import DataLoader, Dataset
 from sklearn.model_selection import train_test_split
-
+from utils.ica_utils import apply_ica_to_eeg_spectrograms
+from utils.mspca_utils import apply_mspca_to_eeg_spectrograms
 class CustomDataset(Dataset):
     """
     Custom Dataset for EEG data.
@@ -70,8 +71,30 @@ class CustomDataset(Dataset):
         else:
             self.logger.info("Processing and caching new dataset")
             self.load_data(self.config.SUBSET_SAMPLE_COUNT)
-            self.eeg_spectrograms = load_eeg_spectrograms(main_df=self.main_df, mode=self.mode, feats = self.config.FEATS, use_wavelet=self.config.USE_WAVELET)
-            self.spectrograms = load_spectrograms(main_df=self.main_df, mode=self.mode)
+            if self.config.USE_PRELOADED_EEG_SPECTROGRAMS:
+                self.eeg_spectrograms = load_preloaded_eeg_spectrograms(self.main_df)
+            else:
+                self.eeg_spectrograms = load_eeg_spectrograms(main_df=self.main_df, mode=self.mode, feats = self.config.FEATS, use_wavelet=self.config.USE_WAVELET)
+            
+            if self.config.NORMALIZE_EEG_SPECTROGRAMS:
+                self.eeg_spectrograms = normalize_eeg_spectrograms(self.eeg_spectrograms)
+          
+            if self.config.APPLY_ICA_EEG_SPECTROGRAMS:
+                self.eeg_spectrograms = apply_ica_to_eeg_spectrograms(self.eeg_spectrograms)
+                if self.config.NORMALIZE_EEG_SPECTROGRAMS:
+                    self.eeg_spectrograms = normalize_eeg_spectrograms(self.eeg_spectrograms)
+            
+            if self.config.APPLY_MSPCA_EEG_SPECTROGRAMS:
+                self.eeg_spectrograms = apply_mspca_to_eeg_spectrograms(self.eeg_spectrograms, n_components=self.config.N_COMPONENTS)
+                if self.config.NORMALIZE_EEG_SPECTROGRAMS:
+                    self.eeg_spectrograms = normalize_eeg_spectrograms(self.eeg_spectrograms)
+          
+            if self.config.USE_PRELOADED_SPECTROGRAMS:
+                self.spectrograms = load_preloaded_spectrograms(self.main_df)
+            else:
+                self.spectrograms = load_spectrograms(main_df=self.main_df, mode=self.mode)
+                
+            
             if self.mode == "train" and config.ONE_CROP_PER_PERSON:
                 self.main_df = create_non_overlapping_eeg_crops(self.main_df, self.label_cols)
             if cache:
@@ -90,7 +113,7 @@ class CustomDataset(Dataset):
         Returns:
             str: Filename for caching the dataset.
         """
-        config_summary = f"CustomDataset_{subset_sample_count}_{mode}_{self.config.ONE_CROP_PER_PERSON}"
+        config_summary = f"{self.config.NAME}_{subset_sample_count}_{mode}"
         return os.path.join(Paths.CACHE_PATH, f"{config_summary}.npz")
 
     def cache_data(self, cache_file: str):

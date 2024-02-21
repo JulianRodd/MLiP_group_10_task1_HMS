@@ -45,7 +45,35 @@ def load_eeg_spectrograms(main_df: pd.DataFrame, mode: str, feats, use_wavelet) 
         logger.error(f"Error loading eeg_spectrograms: {e}")
         raise
 
+def load_preloaded_eeg_spectrograms(main_df: pd.DataFrame):
+    pre_loaded_eegs = np.load(Paths.PRE_LOADED_EEGS, allow_pickle=True).item()
+    # select only where in main_df
+    return {k: v for k, v in pre_loaded_eegs.items() if k in main_df["eeg_id"].values}
 
+def normalize_eeg_spectrograms(eeg_spectrograms: Dict[int, np.ndarray]) -> Dict[int, np.ndarray]:
+    """
+    Normalize EEG data in a dictionary by subtracting the mean and dividing by the standard deviation.
+
+    Parameters:
+    all_eegs (dict): A dictionary containing EEG data with shape (128, 256, 4) for each entry.
+
+    Returns:
+    dict: A new dictionary containing normalized EEG data.
+    """
+    normalized_eegs = {}
+    
+    for eeg_id, eeg_data in eeg_spectrograms.items():
+        mean = np.mean(eeg_data, axis=(0, 1))
+        std = np.std(eeg_data, axis=(0, 1))
+        normalized_eeg = (eeg_data - mean) / std
+        normalized_eegs[eeg_id] = normalized_eeg
+
+    return normalized_eegs
+
+def load_preloaded_spectrograms(main_df: pd.DataFrame):
+    pre_loaded_spectrograms = np.load(Paths.PRE_LOADED_SPECTROGRAMS, allow_pickle=True).item()
+    # select only where in main_df
+    return {k: v for k, v in pre_loaded_spectrograms.items() if k in main_df["spectrogram_id"].values}
 def load_spectrograms(main_df: pd.DataFrame, mode: str) -> Dict[int, np.ndarray]:
     """
     Load spectrogram data for the spectrogram IDs present in the provided DataFrame.
