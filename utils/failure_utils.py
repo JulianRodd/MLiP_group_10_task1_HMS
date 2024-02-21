@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import itertools
 from sklearn.metrics import confusion_matrix
 import numpy as np 
+from inference_utils import perform_inference
+from generics import Generics 
 
 
 def plot_confusion_matrix(cm, classes,
@@ -69,4 +71,48 @@ def avg_mispred(y_pred:np.ndarray, y_true:np.ndarray, by_class=True):
         result = np.mean(diff, axis=0)
 
     return result 
+
+def plot_avg_mispred(differences:np.ndarray, by_class=True): 
+    x_ax = np.arange(0.5, len(Generics.LABEL_COLS)+0.5)
+    if by_class: 
+        for i, clss in enumerate(Generics.LABEL_COLS): 
+            plt.bar(x=x_ax, height=differences[i])
+            plt.xticks(ticks=x_ax, labels=Generics.LABEL_COLS)
+            plt.title(f'Avg misprediction per true majority class - {clss}')
+            plt.show()
+    else: 
+        plt.bar(x=np.arange(len(Generics.LABEL_COLS)), height=differences[i])
+        plt.title(f'Avg misprediction')
+        plt.xticks(ticks=x_ax, labels=Generics.LABEL_COLS)
+        plt.show()
+
+
+def failure_analysis(dataset, model, model_dir): 
+    """
+    Perform inference on the val dataset using the trained model and log results to TensorBoard.
+    Show confusion matrix for majority class and average difference to ground truth distribution. 
+
+    Args:
+        test_dataset (CustomDataset): The test dataset.
+        model (torch.nn.Module): The base model on with which checkpoints were generated.
+        model_dirs (list): list of paths to model checkpoints to test 
+
+    Returns: 
+        confusion matrix of majority classes (np.ndarray)
+        avg differences between true and predicted per class (np.ndarray)
+        avg differences between true and predicted across classes (np.ndarray)
+    """
+
+    y_pred = perform_inference(dataset, model, [model_dir])
+    y_true = None 
+    
+    cnf_mtrx = majority_confusion(y_pred=y_pred, y_true=y_true, labels=Generics.LABEL_COLS)
+
+    diff_classes = avg_mispred(y_pred=y_pred, y_true=y_true, by_class=True)
+    diff_general = avg_mispred(y_pred=y_pred, y_true=y_true, by_class=False)
+
+    plot_avg_mispred(diff_classes, by_class=True)
+    plot_avg_mispred(diff_general, by_class=False)
+
+    return cnf_mtrx, diff_classes, diff_general
 

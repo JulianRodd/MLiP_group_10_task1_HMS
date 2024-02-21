@@ -15,7 +15,8 @@ def perform_inference(test_dataset: CustomDataset, model, model_dirs: list):
 
     Args:
         test_dataset (CustomDataset): The test dataset.
-        model (torch.nn.Module): The trained model.
+        model (torch.nn.Module): The base model on with which checkpoints were generated.
+        model_dirs (list): list of paths to model checkpoints to test 
 
     Returns:
         Dictionary: A dictionary containing model predictions for the test set.
