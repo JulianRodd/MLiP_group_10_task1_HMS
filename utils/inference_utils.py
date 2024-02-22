@@ -7,6 +7,7 @@ from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 from tqdm import tqdm
 from torch import nn
+from generics import Generics
 
 
 def perform_inference(test_dataset: CustomDataset, model, model_dirs: list):
@@ -24,7 +25,7 @@ def perform_inference(test_dataset: CustomDataset, model, model_dirs: list):
     combined_writer = SummaryWriter(Paths.TENSORBOARD_INFERENCE, f"{model.config.NAME}_{test_dataset.config.NAME}_combined")
     combined_preds = []
     for model_dir in model_dirs:
-        model.load_state_dict(torch.load(model_dir))
+        model.load_state_dict(torch.load(model_dir), map_location=Generics.DEVICE)
         model.eval()  # Set the model to evaluation mode
         test_loader = test_dataset.get_torch_data_loader()
         softmax = nn.Softmax(dim=1)
