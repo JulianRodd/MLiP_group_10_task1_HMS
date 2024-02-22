@@ -130,9 +130,7 @@ def run_failure_analysis(model_config:BaseModelConfig, data_loader_config:BaseDa
     else: 
         Paths
    
-    model_dirs = [f"""{paths.BEST_MODEL_CHECKPOINTS}
-                  /best_{model_config.MODEL}{model_config.NAME}{data_loader_config.NAME}
-                  fold{fold}.pth""" for fold in range(model_config.FOLDS)]
+    model_dirs = [f"""{paths.BEST_MODEL_CHECKPOINTS}/best_{model_config.MODEL}{model_config.NAME}{data_loader_config.NAME}fold{fold}.pth""" for fold in range(model_config.FOLDS)]
     
     dataset = CustomDataset(config=data_loader_config, mode='val') # how to get the right val fold --> val split ratio is 0.2 but there are three folds for this config 
 
