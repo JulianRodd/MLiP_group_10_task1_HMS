@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import itertools
 from sklearn.metrics import confusion_matrix
 import numpy as np 
-from inference_utils import perform_inference
+from utils.inference_utils import perform_inference
 from generics import Generics, Paths 
 from datasets.data_loader import CustomDataset
 from datasets.data_loader_configs import BaseDataConfig
