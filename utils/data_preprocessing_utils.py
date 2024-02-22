@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from utils.general_utils import get_logger
+from generics import Generics
 
 
 def create_non_overlapping_eeg_crops(df: pd.DataFrame, label_cols: list) -> pd.DataFrame:
@@ -60,9 +61,8 @@ def filter_by_agreement(df:pd.DataFrame, min:float):
     Returns df with rows having more than min agreement (min in %). 
     '''
     
-    vote_cols = ['seizure_vote','lpd_vote', 'gpd_vote', 'lrda_vote','grda_vote','other_vote']
-    max_votes = df[vote_cols].max(axis=1)
-    total_votes = df[vote_cols].sum(axis=1)
+    max_votes = df[Generics.LABEL_COLS].max(axis=1)
+    total_votes = df[Generics.LABEL_COLS].sum(axis=1)
     min /= 100
     bool_filter = (max_votes/total_votes)>min
 
@@ -72,12 +72,13 @@ def filter_by_agreement(df:pd.DataFrame, min:float):
 def filter_by_annotators(df:pd.DataFrame, min:int, max:int=np.inf):
     '''
     Takes train/test df
-    Returns df with rows having more than min number of annotators
+    Returns df with rows having more than or min number of annotators and less than max
     '''
-    
-    vote_cols = ['seizure_vote','lpd_vote', 'gpd_vote', 'lrda_vote','grda_vote','other_vote']
-    total_votes = df[vote_cols].sum(axis=1)
-    bool_filter = total_votes>=min & total_votes < max
+
+    total_votes = df[Generics.LABEL_COLS].sum(axis=1)
+    filter_min = total_votes >=min 
+    filter_max = total_votes < max
+
+    bool_filter = filter_min & filter_max
 
     return df[bool_filter]
-
