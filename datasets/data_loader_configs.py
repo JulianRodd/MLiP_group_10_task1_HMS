@@ -150,7 +150,6 @@ class Config_Normalize_Group_Raw_ICA(BaseDataConfig):
     NORMALIZE_INDIVIDUALLY = False
     APPLY_ICA_RAW_EEG = True
     USE_PRELOADED_EEG_SPECTROGRAMS = False
-    SUBSET_SAMPLE_COUNT = 1
 
  # SmallBaseConfig, SmallConfig_Normalize, SmallConfig_EnhancedMSPCA,SmallConfig_Raw_ICA,  SmallConfig_Normalize_Indiv, SmallConfig_Normalize_Indiv_Raw_MSPCA, SmallConfig_Normalize_Indiv_Raw_ICA, SmallConfig_Normalize_Indiv_Raw_MSPCA, SmallConfig_Normalize_Indiv_Raw_ICA, 
 DATASET_GRID_SEARCH = [SmallConfig_Normalize_Group_Raw_ICA]

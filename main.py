@@ -1,9 +1,10 @@
-from multiprocessing import get_logger
+
 from datasets.data_loader import CustomDataset
 from datasets.data_loader_configs import Config_Normalize_Group_Raw_ICA
 from generics import Paths
 from models.CustomModel import CustomModel
 from models.custom_model_configs import EfficientNetB0Config_Big
+from utils.general_utils import get_logger
 from utils.inference_utils import perform_inference
 from utils.loader_utils import load_main_dfs
 from utils.training_utils import train
