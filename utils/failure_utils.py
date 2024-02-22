@@ -3,7 +3,7 @@ import itertools
 from sklearn.metrics import confusion_matrix
 import numpy as np 
 from utils.inference_utils import perform_inference
-from generics import Generics, Paths 
+from generics import Generics, Paths, KagglePaths 
 from datasets.data_loader import CustomDataset
 from datasets.data_loader_configs import BaseDataConfig
 from models.CustomModel import CustomModel
@@ -123,9 +123,14 @@ def failure_analysis(dataset:CustomDataset, model:CustomModel, model_dir:str):
     return cnf_mtrx, diff_classes, diff_general
 
 
-def run_failure_analysis(model_config:BaseModelConfig, data_loader_config:BaseDataConfig, model:CustomModel): 
+def run_failure_analysis(model_config:BaseModelConfig, data_loader_config:BaseDataConfig, model:CustomModel, kaggle=True): 
 
-    model_dirs = [f"""{Paths.BEST_MODEL_CHECKPOINTS}
+    if kaggle: 
+        paths = KagglePaths
+    else: 
+        Paths
+   
+    model_dirs = [f"""{paths.BEST_MODEL_CHECKPOINTS}
                   /best_{model_config.MODEL}{model_config.NAME}{data_loader_config.NAME}
                   fold{fold}.pth""" for fold in range(model_config.FOLDS)]
     
