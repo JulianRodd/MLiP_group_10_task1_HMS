@@ -13,6 +13,7 @@ class CustomModel(nn.Module):
         num_classes: int = 6,
         pretrained: bool = True,
         device=Generics.DEVICE,
+        tensorboard_prefix: str = "all",
     ):
         super(CustomModel, self).__init__()
         self.logger = get_logger(f"models/{__name__}")
@@ -39,7 +40,7 @@ class CustomModel(nn.Module):
             nn.Flatten(),
             nn.Linear(self.model.num_features, num_classes),
         )
-        self.writer = SummaryWriter(log_dir=os.path.join(Paths.TENSORBOARD_MODELS, config.NAME))
+        self.writer = SummaryWriter(log_dir=os.path.join(Paths.TENSORBOARD_MODELS, f"{tensorboard_prefix}/{config.NAME}"))
         self.to(self.device)
         self.logger.info(f"{config.MODEL} initialized with config {config.NAME}")
       

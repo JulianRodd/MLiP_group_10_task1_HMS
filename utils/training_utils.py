@@ -14,7 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def perform_cross_validation(train_dataset, val_dataset, model):
+def train(train_dataset, val_dataset, model, tensorboard_prefix: str = "all"):
     """
     Perform cross-validation training and validation.
 
@@ -22,41 +22,25 @@ def perform_cross_validation(train_dataset, val_dataset, model):
         train_dataset (CustomDataset): The training dataset.
         val_dataset (CustomDataset): The validation dataset.
         model (torch.nn.Module): The model to train.
-
-    Returns:
-        pd.DataFrame: DataFrame containing out-of-fold predictions.
     """
     oof_df = pd.DataFrame()
-    try:
-        for fold in range(model.config.FOLDS):
-            logger.info(f"Starting training for Fold {fold}")
-            preds, actual = train_loop(train_dataset, val_dataset, model, fold)
+    preds, actual = train_loop(train_dataset, val_dataset, model, tensorboard_prefix)
 
-            # Check and reshape preds if necessary
-            if len(preds.shape) == 1 or preds.shape[1] == 1:
-                preds = preds.reshape(-1, len(Generics.LABEL_COLS))
+    # Check and reshape preds if necessary
+    if len(preds.shape) == 1 or preds.shape[1] == 1:
+        preds = preds.reshape(-1, len(Generics.LABEL_COLS))
 
-            preds_df = pd.DataFrame(preds, columns=Generics.LABEL_COLS)
-            actual_df = pd.DataFrame(actual, columns=Generics.TARGET_PREDS)
+    preds_df = pd.DataFrame(preds, columns=Generics.LABEL_COLS)
+    actual_df = pd.DataFrame(actual, columns=Generics.TARGET_PREDS)
 
-            _oof_df = pd.concat([actual_df, preds_df], axis=1)
-            oof_df = pd.concat([oof_df, _oof_df]).reset_index(drop=True)
-            
-            fold_result = get_result(_oof_df)
-            logger.info(f"========== Fold {fold} result: {fold_result} ==========")
-
-        cv_result = get_result(oof_df)
-        logger.info(f"========== CV Result: {cv_result} ==========")
-
-    except Exception as e:
-        logger.error(f"An error occurred during cross-validation: {e}")
-        raise
-
+    _oof_df = pd.concat([actual_df, preds_df], axis=1)
+    oof_df = pd.concat([oof_df, _oof_df]).reset_index(drop=True)
+  
     return oof_df
 
 
 def train_loop(
-    train_dataset: CustomDataset, val_dataset: CustomDataset, model, fold: int
+    train_dataset: CustomDataset, val_dataset: CustomDataset, model, tensorboard_prefix: str = "all"
 ):
     preds = []
     actual = []
@@ -64,11 +48,10 @@ def train_loop(
 
     tb_run_path = os.path.join(
         Paths.TENSORBOARD_TRAINING,
-        f"{train_dataset.config.NAME}_{model.config.NAME}",
+        f"{tensorboard_prefix}/{train_dataset.config.NAME}_{model.config.NAME}/{train_dataset.config.NAME}_{model.config.NAME}",
     )
     writer = SummaryWriter(tb_run_path)
     try:
-        logger.info(f"========== Fold: {fold} training ==========")
         best_loss = np.inf
         model_config = model.config
         criterion = nn.KLDivLoss(reduction=model_config.KLDIV_REDUCTION)
@@ -79,6 +62,7 @@ def train_loop(
         val_loader = val_dataset.get_torch_data_loader()
 
         for epoch in range(model_config.EPOCHS):
+            logger.info(f"Epoch {epoch + 1}/{total_epochs}")
             avg_train_loss = _train_epoch(
                 train_loader,
                 model,
@@ -87,26 +71,13 @@ def train_loop(
                 epoch,
                 scheduler,
                 model.device,
+                writer
             )
-            avg_val_loss = _valid_epoch(val_loader, model, criterion, model.device)
-
-
-            # Log the losses with the combined index
-            writer.add_scalar("Loss/Train", avg_train_loss)
-            writer.add_scalar("Loss/Validation", avg_val_loss)
-
-            # Save checkpoint after each epoch with fold information
-            checkpoint_name = f"{model_config.MODEL}_{model_config.NAME}_{train_dataset.config.NAME}_fold_{fold}_epoch_{epoch+1}_loss_{avg_val_loss:.4f}.pth"
-            torch.save(
-                model.state_dict(),
-                os.path.join(Paths.OTHER_MODEL_CHECKPOINTS, checkpoint_name),
-            )
-
+            avg_val_loss = _valid_epoch(val_loader, model, criterion, model.device, writer, epoch)
             _log_epoch_results(
                 epoch,
                 avg_train_loss,
                 avg_val_loss,
-                fold,
                 model,
                 train_dataset.config.NAME,
             )
@@ -114,7 +85,7 @@ def train_loop(
             # Save the best model with fold information
             if avg_val_loss < best_loss:
                 best_loss = avg_val_loss
-                best_model_name = f"best_{model_config.MODEL}_{model_config.NAME}_{train_dataset.config.NAME}_fold_{fold}.pth"
+                best_model_name = f"best_{model_config.MODEL}_{model_config.NAME}_{train_dataset.config.NAME}.pth"
                 torch.save(
                     model.state_dict(),
                     os.path.join(Paths.BEST_MODEL_CHECKPOINTS, best_model_name),
@@ -200,7 +171,7 @@ def _configure_scheduler(optimizer, config):
     return scheduler
 
 
-def _train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, device):
+def _train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, device, writer):
     """
     Handles the training of the model for one epoch.
 
@@ -219,7 +190,7 @@ def _train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, de
     model.train()  # Set the model to training mode
     total_loss = 0
     total_batches = len(train_loader)
-
+    i = 0
     for batch_idx, (inputs, targets) in enumerate(train_loader):
         inputs, targets = inputs.to(device), targets.to(device)
 
@@ -241,12 +212,15 @@ def _train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, de
 
         # Update learning rate
         scheduler.step()
+        writer.add_scalar("Loss/Train", loss.item(), i + total_batches*epoch)
+        
+        i += 1
 
     average_loss = total_loss / total_batches
     return average_loss
 
 
-def _valid_epoch(val_loader, model, criterion, device):
+def _valid_epoch(val_loader, model, criterion, device, writer, epoch=0):
     """
     Handles the validation of the model for one epoch.
 
@@ -262,24 +236,32 @@ def _valid_epoch(val_loader, model, criterion, device):
     model.eval()  # Set the model to evaluation mode
     total_loss = 0
     total_batches = len(val_loader)
-
+    i = 0
     with torch.no_grad():  # Disable gradient computation
         for batch_idx, (inputs, targets) in enumerate(val_loader):
             inputs, targets = inputs.to(device), targets.to(device)
 
             # Forward pass
             outputs = model(inputs)
+            outputs = torch.nn.functional.log_softmax(outputs + 1e-6, dim=1)
             loss = criterion(outputs, targets)
 
+            if loss.item() < 0:  # Add a check for negative loss
+              logger.warning(f"Negative loss encountered: {loss.item()}")
+              logger.warning(f"Outputs: {outputs}")
+              logger.warning(f"Targets: {targets}")
+            
             total_loss += loss.item()
-
+            writer.add_scalar("Loss/Validation", loss.item(), i + total_batches*epoch)
+            
+            i += 1
             # Additional operations for metrics or logging can be added here
 
     average_loss = total_loss / total_batches
     return average_loss
 
 
-def _log_epoch_results(epoch, avg_train_loss, avg_val_loss, fold, model, dataset_name):
+def _log_epoch_results(epoch, avg_train_loss, avg_val_loss, model, dataset_name):
     """
     Logs the results at the end of each epoch during training and validation.
 
@@ -288,7 +270,6 @@ def _log_epoch_results(epoch, avg_train_loss, avg_val_loss, fold, model, dataset
         avg_train_loss (float): The average training loss for the epoch.
         avg_val_loss (float): The average validation loss for the epoch.
         prediction_dict (dict): A dictionary containing predictions and other relevant information.
-        fold (int): The current fold number in a cross-validation setup.
         model (torch.nn.Module): The model being trained and validated.
         dataset_name (str): The name of the dataset used for training and validation.
 
@@ -296,10 +277,6 @@ def _log_epoch_results(epoch, avg_train_loss, avg_val_loss, fold, model, dataset
         None
     """
     logger = logging.getLogger(__name__)
-
-    logger.info(
-        f"Epoch {epoch+1} / Fold {fold} / Dataset {dataset_name} / Model {model.config.NAME}"
-    )
     logger.info(f"Average Training Loss: {avg_train_loss:.4f}")
     logger.info(f"Average Validation Loss: {avg_val_loss:.4f}")
 
@@ -325,7 +302,7 @@ def _collect_final_predictions(val_loader, model, device):
 
             # Forward pass to get outputs/predictions
             outputs = model(inputs)
-
+            outputs = torch.nn.functional.log_softmax(outputs + 1e-6, dim=1)
             # Convert outputs to probabilities and then to CPU for further processing if needed
             probabilities = torch.nn.functional.softmax(outputs, dim=1)
             predictions.extend(probabilities.cpu().numpy())

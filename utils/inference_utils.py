@@ -9,7 +9,7 @@ from tqdm import tqdm
 from torch import nn
 
 
-def perform_inference(test_dataset: CustomDataset, model, model_dirs: list):
+def perform_inference(test_dataset: CustomDataset, model, model_dir: str, tensorboard_prefix="all"):
     """
     Perform inference on the test dataset using the trained model and log results to TensorBoard.
 
@@ -20,34 +20,33 @@ def perform_inference(test_dataset: CustomDataset, model, model_dirs: list):
     Returns:
         Dictionary: A dictionary containing model predictions for the test set.
     """
-    combined_writer = SummaryWriter(Paths.TENSORBOARD_INFERENCE, f"{model.config.NAME}_{test_dataset.config.NAME}_combined")
+    combined_writer = SummaryWriter(Paths.TENSORBOARD_INFERENCE, f"{tensorboard_prefix}/{model.config.NAME}_{test_dataset.config.NAME}_combined")
     combined_preds = []
-    for model_dir in model_dirs:
-        model.load_state_dict(torch.load(model_dir))
-        model.eval()  # Set the model to evaluation mode
-        test_loader = test_dataset.get_torch_data_loader()
-        softmax = nn.Softmax(dim=1)
-        prediction_dict = {}
-        preds = []
+    model.load_state_dict(torch.load(model_dir))
+    model.eval()  # Set the model to evaluation mode
+    test_loader = test_dataset.get_torch_data_loader()
+    softmax = nn.Softmax(dim=1)
+    prediction_dict = {}
+    preds = []
 
-        # Setup TensorBoard writer
-        tb_run_path = os.path.join(
-            Paths.TENSORBOARD_INFERENCE,
-            f"{model.config.NAME}_{test_dataset.config.NAME}"
-        )
-        writer = SummaryWriter(tb_run_path)
+    # Setup TensorBoard writer
+    tb_run_path = os.path.join(
+        Paths.TENSORBOARD_INFERENCE,
+        f"{model.config.NAME}_{test_dataset.config.NAME}"
+    )
+    writer = SummaryWriter(tb_run_path)
 
-        with tqdm(test_loader, unit="test_batch", desc='Inference') as tqdm_test_loader:
-            for step, (X, _) in enumerate(tqdm_test_loader):
-                X = X.to(model.device)
-                with torch.no_grad():
-                    y_preds = model(X)
-                y_preds = softmax(y_preds)
-                preds.append(y_preds.to('cpu').numpy())
+    with tqdm(test_loader, unit="test_batch", desc='Inference') as tqdm_test_loader:
+        for step, (X, _) in enumerate(tqdm_test_loader):
+            X = X.to(model.device)
+            with torch.no_grad():
+                y_preds = model(X)
+            y_preds = softmax(y_preds)
+            preds.append(y_preds.to('cpu').numpy())
 
-                # Log predictions as histograms to TensorBoard
-                for i, probability in enumerate(y_preds.to('cpu').numpy()):
-                    writer.add_histogram(f"Predictions/Batch_{step}_Sample_{i}", probability, step)
+            # Log predictions as histograms to TensorBoard
+            for i, probability in enumerate(y_preds.to('cpu').numpy()):
+                writer.add_histogram(f"Predictions/Batch_{step}_Sample_{i}", probability, step)
 
         # Check if preds is empty
         if not preds:
