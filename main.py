@@ -1,21 +1,16 @@
-from utils.failure_utils import failure_analysis
-from generics import Paths
+from utils.failure_utils import run_failure_analysis
+from datasets import data_loader_configs
+from models import custom_model_configs, CustomModel
+
 
 
 
 def main():
-
-    model_config = None 
-    data_loader_config = None 
-    model = None # base model to load chkpts in 
-
-    model_dirs = [f"""{Paths.BEST_MODEL_CHECKPOINTS}
-                  /best_{model_config.MODEL}{model_config.NAME}{data_loader_config.NAME}
-                  fold{fold}.pth""" for fold in range(model_config.FOLDS)]
+    model_config = custom_model_configs.EfficientNetB0ConfigV1
+    model=CustomModel.CustomModel(model_config)
     
-    for fold in range(model_config.FOLDS):
-        dataset = None # how to get the right val fold 
-        failure_analysis(model_dir=model_dirs[fold], model=model, dataset=dataset)
+    run_failure_analysis(model_config=model_config,
+        data_loader_config=data_loader_configs.SmallBaseConfig, model=model)
     
     
 

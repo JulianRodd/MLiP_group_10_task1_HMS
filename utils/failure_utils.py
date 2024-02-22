@@ -3,7 +3,11 @@ import itertools
 from sklearn.metrics import confusion_matrix
 import numpy as np 
 from inference_utils import perform_inference
-from generics import Generics 
+from generics import Generics, Paths 
+from datasets.data_loader import CustomDataset
+from datasets.data_loader_configs import BaseDataConfig
+from models.CustomModel import CustomModel
+from models.custom_model_configs import BaseModelConfig
 
 
 def plot_confusion_matrix(cm, classes,
@@ -87,7 +91,7 @@ def plot_avg_mispred(differences:np.ndarray, by_class=True):
         plt.show()
 
 
-def failure_analysis(dataset, model, model_dir): 
+def failure_analysis(dataset:CustomDataset, model:CustomModel, model_dir:str): 
     """
     Perform inference on the val dataset using the trained model and log results to TensorBoard.
     Show confusion matrix for majority class and average difference to ground truth distribution. 
@@ -95,7 +99,7 @@ def failure_analysis(dataset, model, model_dir):
     Args:
         test_dataset (CustomDataset): The test dataset.
         model (torch.nn.Module): The base model on with which checkpoints were generated.
-        model_dirs (list): list of paths to model checkpoints to test 
+        model_dir (str): path to model checkpoint to test 
 
     Returns: 
         confusion matrix of majority classes (np.ndarray)
@@ -104,7 +108,9 @@ def failure_analysis(dataset, model, model_dir):
     """
 
     y_pred = perform_inference(dataset, model, [model_dir])
-    y_true = None 
+
+    dataset.load_data()
+    y_true = dataset.main_df[Generics.LABEL_COLS]
     
     cnf_mtrx = majority_confusion(y_pred=y_pred, y_true=y_true, labels=Generics.LABEL_COLS)
 
@@ -115,4 +121,16 @@ def failure_analysis(dataset, model, model_dir):
     plot_avg_mispred(diff_general, by_class=False)
 
     return cnf_mtrx, diff_classes, diff_general
+
+
+def run_failure_analysis(model_config:BaseModelConfig, data_loader_config:BaseDataConfig, model:CustomModel): 
+
+    model_dirs = [f"""{Paths.BEST_MODEL_CHECKPOINTS}
+                  /best_{model_config.MODEL}{model_config.NAME}{data_loader_config.NAME}
+                  fold{fold}.pth""" for fold in range(model_config.FOLDS)]
+    
+    dataset = CustomDataset(config=data_loader_config, mode='val') # how to get the right val fold --> val split ratio is 0.2 but there are three folds for this config 
+
+    for fold in range(model_config.FOLDS):
+        failure_analysis(model_dir=model_dirs[fold], model=model, dataset=dataset)
 
