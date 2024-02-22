@@ -1,5 +1,5 @@
 import pandas as pd
-
+import numpy as np
 from utils.general_utils import get_logger
 
 
@@ -69,7 +69,7 @@ def filter_by_agreement(df:pd.DataFrame, min:float):
     return df[bool_filter]
 
 
-def filter_by_annotators(df:pd.DataFrame, min:int):
+def filter_by_annotators(df:pd.DataFrame, min:int, max:int=np.inf):
     '''
     Takes train/test df
     Returns df with rows having more than min number of annotators
@@ -77,7 +77,7 @@ def filter_by_annotators(df:pd.DataFrame, min:int):
     
     vote_cols = ['seizure_vote','lpd_vote', 'gpd_vote', 'lrda_vote','grda_vote','other_vote']
     total_votes = df[vote_cols].sum(axis=1)
-    bool_filter = total_votes>min
+    bool_filter = total_votes>=min & total_votes < max
 
     return df[bool_filter]
 
