@@ -10,7 +10,7 @@ from prettytable import PrettyTable
 from generics import Paths, Generics
 from datasets.data_loader_configs import BaseDataConfig
 from utils.general_utils import get_logger
-
+from utils.feature_extraction_utils import get_hfda, get_psd
 
 class CustomRawDataset():
     """
@@ -33,8 +33,7 @@ class CustomRawDataset():
         subset_sample_count: int = 0,
         mode: str = "train",
         cache: bool = True,
-        feature_func: Callable | None = None,
-        feature_func_kwargs: dict = {}
+        feature_list: list = ["desc"],
     ):
         """
         Initialize the dataset.
@@ -51,6 +50,8 @@ class CustomRawDataset():
         self.mode = mode
         self.main_df = pd.DataFrame()
         self.label_cols = []
+        self.feature_list = sorted(feature_list)
+        self.channels = []
         
         self.features_per_sample: np.ndarray | None = None
         self.lbl_probabilities: np.ndarray | None = None
@@ -63,35 +64,34 @@ class CustomRawDataset():
         else:
             self.logger.info("Processing and caching new dataset")
             self.load_data(subset_sample_count)
-            
-            feature_func = self.extract_features if feature_func is None else feature_func
-            self.load_x_y(feature_func=feature_func, feature_func_kwargs=feature_func_kwargs)
+            self.load_x_y()
             
             if cache:
               self.cache_data(cache_file)
     
-    def load_x_y(self, feature_func: Callable, feature_func_kwargs: dict = {}):
+    def load_x_y(self):
         eeg_ids = np.asarray(self.main_df["eeg_id"])
         eeg_paths = glob(f"{self.paths.TRAIN_EEGS if self.mode=='train' else self.paths.TEST_EEGS}*.parquet")
 
         eegs = self.load_eegs_from_parquet(eeg_paths, eeg_ids)
 
-        channels = [self.config.EKG_FEAT]
-        [channels.extend(i) for i in self.config.FEATS]
-        channels = list(set(channels))
-        
-        one_hot_df = self.get_one_hot(channels)
-        
         expert_lbls = np.zeros((len(self.main_df), 6))
         subsample_eeg_ids = np.zeros(len(self.main_df))
         
-        sample_eeg = pd.read_parquet(f"{self.paths.TRAIN_EEGS if self.mode=='train' else self.paths.TEST_EEGS}{eeg_ids[0]}.parquet").iloc[:5]
-        features_per_sample = np.zeros(((len(self.main_df), len(feature_func(sample_eeg, channels, one_hot_df, **feature_func_kwargs)))))
-        
+        sample_eeg = pd.read_parquet(f"{self.paths.TRAIN_EEGS if self.mode=='train' else self.paths.TEST_EEGS}{eeg_ids[0]}.parquet").iloc[:10]
+        self.channels = sample_eeg.columns
+
+        one_hot_df = self.get_one_hot()
+        features_per_sample = np.zeros(((len(self.main_df), len(self.extract_features(sample_eeg, one_hot_df)))))
+
         subsamples_added = 0
 
+        self.logger.info(f"Loading raw eeg data with features: {self.feature_list}")
         for i, (eeg_id, eeg) in tqdm(enumerate(eegs)):
             eeg = self.cleanup_nans(eeg)
+            if True in list((eeg[eeg.columns] == 0).all()):
+                bools = (eeg[eeg.columns] == 0).all()
+                self.logger.info(f"EEG with ID {eeg_id} has no value above zero in some channels(s): {list(bools[bools].index)}")
             if eeg_id in list(self.main_df["eeg_id"]):
                 subsamples = self.main_df[self.main_df["eeg_id"] == eeg_id]
                 if self.mode == "train":
@@ -102,10 +102,10 @@ class CustomRawDataset():
                         ]
                         expert_lbls[subsamples_added + j -1] = np.asarray(subsample[self.label_cols])
                         subsample_eeg_ids[subsamples_added + j -1] = subsample["eeg_sub_id"]
-                        features_per_sample[subsamples_added + j -1] = feature_func(subsample_eeg, channels, one_hot_df, **feature_func_kwargs)
+                        features_per_sample[subsamples_added + j -1] = self.extract_features(subsample_eeg, one_hot_df)
                     subsamples_added += len(subsamples)
                 else:
-                    features_per_sample[i] = feature_func(eeg, channels, one_hot_df, **feature_func_kwargs)
+                    features_per_sample[i] = self.extract_features(eeg, one_hot_df)
 
         if self.mode == "test":
             assert i + 1 == len(self.main_df), f"Expected the number of eegs in main_df to be equal to the amount of eegs in {self.paths.TEST_EEGS}"
@@ -120,16 +120,16 @@ class CustomRawDataset():
             if eeg_id in eeg_ids:
                 yield eeg_id, pd.read_parquet(parquet_path)
                 
-    def get_one_hot(self, channels) -> pd.DataFrame:
+    def get_one_hot(self) -> pd.DataFrame:
         """Create one-hot encoding per EEG channel, encoding the channel group(s) they are in"""
-        one_hot = {channel: [] for channel in channels}
+        one_hot = {channel: [] for channel in self.channels}
         one_hot["EKG"] = []
         for group in self.config.FEATS:
-            for channel in channels:
+            for channel in self.channels:
                 one_hot[channel].append(int(channel in group))
         return pd.DataFrame(one_hot, index=self.config.NAMES)
     
-    def extract_features(self, eeg_subsample: pd.DataFrame, channels, one_hot_df) -> np.ndarray:
+    def extract_features(self, eeg_subsample: pd.DataFrame, one_hot_df) -> np.ndarray:
         """Extract features from eeg subsample (mean, std, etc) 
             and combine with one-hot encoding per channel
 
@@ -139,8 +139,25 @@ class CustomRawDataset():
         Returns:
             np.ndarray: 1D numpy array with features 
         """
-        desc = eeg_subsample.describe()[channels].iloc[1:]
-        feature_df = pd.concat([desc, one_hot_df])
+        feature_dfs = []
+        eeg_columns = list(eeg_subsample.columns)
+        eeg_columns.remove("EKG")
+        ekg = eeg_subsample["EKG"]
+        eeg_subsample = eeg_subsample[eeg_columns]
+        eeg_np = np.array(eeg_subsample)
+
+        if "desc" in self.feature_list:
+            feature_dfs.append(eeg_subsample.describe()[eeg_columns].iloc[1:])
+
+        if "hfda" in self.feature_list:
+            feature_dfs.append(get_hfda(eeg=eeg_np, eeg_columns=eeg_columns))
+
+        if "psd" in self.feature_list:
+            feature_dfs.append(get_psd(eeg=eeg_np, eeg_columns=eeg_columns))
+        
+        feature_df = pd.concat(feature_dfs)
+        # feature_df.insert(len(eeg_columns), "EKG", ekg)
+        feature_df = pd.concat([feature_df, one_hot_df[eeg_columns]])
         feature_array = np.asarray(feature_df).flatten("F")
 
         return feature_array
@@ -161,7 +178,7 @@ class CustomRawDataset():
         Returns:
             str: Filename for caching the dataset.
         """
-        config_summary = f"CustomRawDataset_{subset_sample_count}_{mode}"
+        config_summary = f"CustomRawDataset_{subset_sample_count}_{mode}_feats:{'_'.join(self.feature_list)}"
         return os.path.join(self.paths.CACHE_PATH, f"{config_summary}.npz")
 
     def cache_data(self, cache_file: str):
@@ -175,7 +192,8 @@ class CustomRawDataset():
                  main_df=self.main_df.to_records(index=False),
                  features_per_sample=self.features_per_sample,
                  subsample_eeg_ids=self.subsample_eeg_ids,
-                 lbl_probabilities=self.lbl_probabilities)
+                 lbl_probabilities=self.lbl_probabilities,
+                 channels=self.channels)
         self.logger.info(f"Dataset cached at {cache_file}")
 
     def load_from_cache(self, cache_file: str):
@@ -191,6 +209,7 @@ class CustomRawDataset():
         self.lbl_probabilities = cached_data['lbl_probabilities']
         self.subsample_eeg_ids = cached_data['subsample_eeg_ids']
         self.label_cols = self.main_df.columns[-6:].tolist()
+        self.channels = cached_data['channels']
 
     def load_data(self, subset_sample_count: int = 0):
         """
@@ -223,7 +242,6 @@ class CustomRawDataset():
             else:
                 self.main_df = main_df
 
-            self.logger.info(f"{self.mode} DataFrame shape: {self.main_df.shape}")
             self.logger.info(f"Labels: {self.label_cols}")
 
         except Exception as e:
