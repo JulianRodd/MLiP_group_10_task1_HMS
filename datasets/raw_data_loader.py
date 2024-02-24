@@ -1,7 +1,6 @@
 import os
 from glob import glob
 from tqdm import tqdm
-from typing import Callable
 
 import pandas as pd
 import numpy as np
@@ -34,6 +33,7 @@ class CustomRawDataset():
         mode: str = "train",
         cache: bool = True,
         feature_list: list = ["desc"],
+        num_threads: int = 1
     ):
         """
         Initialize the dataset.
@@ -52,6 +52,7 @@ class CustomRawDataset():
         self.label_cols = []
         self.feature_list = sorted(feature_list)
         self.channels = []
+        self.num_threads = num_threads
         
         self.features_per_sample: np.ndarray | None = None
         self.lbl_probabilities: np.ndarray | None = None
@@ -87,6 +88,7 @@ class CustomRawDataset():
         subsamples_added = 0
 
         self.logger.info(f"Loading raw eeg data with features: {self.feature_list}")
+
         for i, (eeg_id, eeg) in tqdm(enumerate(eegs)):
             eeg = self.cleanup_nans(eeg)
             if True in list((eeg[eeg.columns] == 0).all()):
@@ -178,7 +180,7 @@ class CustomRawDataset():
         Returns:
             str: Filename for caching the dataset.
         """
-        config_summary = f"CustomRawDataset_{subset_sample_count}_{mode}_feats:{'_'.join(self.feature_list)}"
+        config_summary = f"CustomRawDataset_{subset_sample_count}_{mode}_feats({'_'.join(self.feature_list)})"
         return os.path.join(self.paths.CACHE_PATH, f"{config_summary}.npz")
 
     def cache_data(self, cache_file: str):

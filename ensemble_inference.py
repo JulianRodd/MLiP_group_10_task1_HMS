@@ -13,16 +13,12 @@ logger = getLogger('main')
 config = BaseDataConfig()
 paths = Paths()
 
-def main(models=None, submission_file='submission.csv', normalized=True, feature_list=["desc"]):
-	train_subset_sample_count = 0
-	test_dataset = CustomRawDataset(config, paths, mode="test", cache=True)
+def main(models=None, submission_file='submission.csv', normalized=True, feature_list=["desc"], train_subset_sample_count = 1000):
+	test_dataset = CustomRawDataset(config, paths, mode="test", cache=True, feature_list=feature_list)
 	test_dataset.print_summary()
 
-	x_test = test_dataset.features_per_sample
-	print(x_test.shape)
-
 	if not models:
-		with open(f"{paths.OTHER_MODEL_CHECKPOINTS}ensemble_one_model_per_target_{'norm_' if normalize else ''}{train_subset_sample_count}feats:{'_'.join(sorted(feature_list))}.pickle", "rb") as pickle_file:
+		with open(f"{paths.OTHER_MODEL_CHECKPOINTS}ensemble_one_model_per_target_{train_subset_sample_count}_{'norm_' if normalize else ''}feats({'_'.join(sorted(feature_list))}).pickle", "rb") as pickle_file:
 			models = pickle.load(pickle_file)
 
 	means = models.pop("means")
@@ -30,6 +26,7 @@ def main(models=None, submission_file='submission.csv', normalized=True, feature
 	if normalized:
 		test_dataset.features_per_sample = normalize(means, stds, test_dataset)
 
+	x_test = test_dataset.features_per_sample
 	y_pred = np.zeros((x_test.shape[0], len(models)))  # shape: num_samles, num_labels
 
 	for i, (lbl, model) in enumerate(models.items()):
