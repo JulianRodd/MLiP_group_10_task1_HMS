@@ -13,6 +13,7 @@ from utils.training_utils import train
 def main():
     logger = get_logger("main")
     
+    
     data_loader_config = Config_Normalize_Group_Raw_ICA
     model_config = EfficientNetB0Config_Big
     
