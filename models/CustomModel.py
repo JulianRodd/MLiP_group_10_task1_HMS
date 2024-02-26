@@ -19,8 +19,7 @@ class CustomModel(nn.Module):
         self.logger = get_logger(f"models/{__name__}")
         self.logger.info(f"Using device: {device}")
         self.device = device
-        self.USE_KAGGLE_SPECTROGRAMS = True
-        self.USE_EEG_SPECTROGRAMS = True
+
         self.config = config
         self.model = timm.create_model(
             config.MODEL,
@@ -68,9 +67,9 @@ class CustomModel(nn.Module):
         eegs = torch.cat(eegs, dim=1)
 
         # === Reshape (512,512,3) ===
-        if self.USE_KAGGLE_SPECTROGRAMS & self.USE_EEG_SPECTROGRAMS:
+        if self.config.USE_KAGGLE_SPECTROGRAMS & self.config.USE_EEG_SPECTROGRAMS:
             x = torch.cat([spectograms, eegs], dim=2)
-        elif self.USE_EEG_SPECTROGRAMS:
+        elif self.config.USE_EEG_SPECTROGRAMS:
             x = eegs
         else:
             x = spectograms

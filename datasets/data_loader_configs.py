@@ -31,6 +31,16 @@ class BaseDataConfig:
     APPLY_ICA_RAW_EEG = False
     APPLY_MSPCA_EEG_SPECTROGRAMS = False
     
+    #ANNOTATOR CONFIG
+    FILTER_BY_AGREEMENT = False
+    FILTER_BY_AGREEMENT_MIN = 50
+    FILTER_BY_AGREEMENT_ON_VAL = False
+    
+    FILTER_BY_ANNOTATOR = False
+    FILTER_BY_ANNOTATOR_MAX = 22
+    FILTER_BY_ANNOTATOR_MIN = 7 
+    FILTER_BY_ANNOTATOR_ON_VAL = False
+    
     def __init__(self):
         super().__init__()
         # Constraint checks for instance creation
@@ -57,6 +67,8 @@ class BaseDataConfig:
         if (getattr(cls, 'APPLY_MSPCA_RAW_EEG', False) or getattr(cls, 'APPLY_ICA_RAW_EEG', False)) and getattr(cls, 'USE_PRELOADED_EEG_SPECTROGRAMS', False):
             raise ValueError(f"{cls.NAME}: USE_PRELOADED_EEG_SPECTROGRAMS must be False when APPLY_MSPCA_RAW_EEG or APPLY_ICA_RAW_EEG is True.")
 
+
+
 class ExtremelySmallBaseConfig(BaseDataConfig):
     BATCH_SIZE_TRAIN = 2
     BATCH_SIZE_TEST = 1
@@ -69,6 +81,45 @@ class SmallBaseConfig(BaseDataConfig):
     BATCH_SIZE_VAL = 4
     BATCH_SIZE_TRAIN = 8
 
+class BaseConfig_Train_Annotator_Agreement(BaseDataConfig):
+    FILTER_BY_AGREEMENT = True
+    FILTER_BY_AGREEMENT_MIN = 50
+    FILTER_BY_AGREEMENT_ON_VAL = False
+    
+    FILTER_BY_ANNOTATOR = True
+    FILTER_BY_ANNOTATOR_MAX = 22
+    FILTER_BY_ANNOTATOR_MIN = 7 
+    FILTER_BY_ANNOTATOR_ON_VAL = False
+    
+class BaseConfig_Train_Val_Annotator_Agreement(BaseDataConfig):
+    FILTER_BY_AGREEMENT = True
+    FILTER_BY_AGREEMENT_MIN = 50
+    FILTER_BY_AGREEMENT_ON_VAL = True
+    
+    FILTER_BY_ANNOTATOR = True
+    FILTER_BY_ANNOTATOR_MAX = 22
+    FILTER_BY_ANNOTATOR_MIN = 7 
+    FILTER_BY_ANNOTATOR_ON_VAL = True
+    
+class SmallBaseConfig_Train_Annotator_Agreement(SmallBaseConfig):
+    FILTER_BY_AGREEMENT = True
+    FILTER_BY_AGREEMENT_MIN = 50
+    FILTER_BY_AGREEMENT_ON_VAL = False
+    
+    FILTER_BY_ANNOTATOR = True
+    FILTER_BY_ANNOTATOR_MAX = 22
+    FILTER_BY_ANNOTATOR_MIN = 7 
+    FILTER_BY_ANNOTATOR_ON_VAL = False
+    
+class SmallBaseConfig_Train_Val_Annotator_Agreement(SmallBaseConfig):
+    FILTER_BY_AGREEMENT = True
+    FILTER_BY_AGREEMENT_MIN = 50
+    FILTER_BY_AGREEMENT_ON_VAL = True
+    
+    FILTER_BY_ANNOTATOR = True
+    FILTER_BY_ANNOTATOR_MAX = 22
+    FILTER_BY_ANNOTATOR_MIN = 7 
+    FILTER_BY_ANNOTATOR_ON_VAL = True
 # Renamed Config classes
 class SmallConfig_ICA_Normalize(SmallBaseConfig):
     APPLY_ICA_EEG_SPECTROGRAMS = True

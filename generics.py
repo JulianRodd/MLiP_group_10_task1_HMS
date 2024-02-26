@@ -30,34 +30,6 @@ class Paths:
     LOG_PATH = "./logs/"
 
 
-class KagglePaths:
-    CACHE_DIR = "/data/cache/"
-    PRE_LOADED_EEGS = "/kaggle/input/brain-eeg-spectrograms/eeg_specs.npy"
-    PRE_LOADED_SPECTROGRAMS = "/kaggle/input/brain-spectrograms/specs.npy"
-    TRAIN_CSV = (
-        "/kaggle/input/hms-harmful-brain-activity-classification/train.csv"
-    )
-    TEST_CSV = "/kaggle/input/hms-harmful-brain-activity-classification/test.csv"
-    TEST_EEGS = (
-        "/kaggle/input/hms-harmful-brain-activity-classification/test_eegs/"
-    )
-    TRAIN_EEGS = (
-        "/kaggle/input/hms-harmful-brain-activity-classification/train_eegs/"
-    )
-    TRAIN_SPECTROGRAMS = "/kaggle/input/hms-harmful-brain-activity-classification/train_spectrograms/"
-    TEST_SPECTROGRAMS = "/kaggle/input/hms-harmful-brain-activity-classification/test_spectrograms/"
-
-    OTHER_MODEL_CHECKPOINTS = "/checkpoints/other_models/"
-    BEST_MODEL_CHECKPOINTS = "/checkpoints/best_models/"
-    CACHE_PATH = "/data/cache/"
-    TENSORBOARD = "/tensorboard/"
-    TENSORBOARD_MODELS = "/tensorboard/models/"
-    TENSORBOARD_TRAINING = "/tensorboard/training/"
-    TENSORBOARD_DATASETS = "/tensorboard/datasets/"
-    TENSORBOARD_INFERENCE = "/tensorboard/inference/"
-
-    LOG_PATH = "/logs/"
-
 class Generics:
     OPT_OUT_EEG_ID = [1457334423]
     LABEL_COLS = [

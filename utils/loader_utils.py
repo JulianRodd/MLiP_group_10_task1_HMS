@@ -5,6 +5,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 from glob import glob
+from utils.data_preprocessing_utils import filter_by_agreement, filter_by_annotators
 from utils.eeg_processing_utils import generate_eeg_from_parquet, generate_spectrogram_from_eeg
 from generics import Generics, Paths
 from utils.general_utils import get_logger
@@ -21,8 +22,10 @@ from utils.ica_utils import apply_ica_raw_eeg
 from utils.mspca_utils import apply_mspca_raw_eeg
 
 
-def load_main_dfs(train_sample_count: int, train_val_split = (0.8, 0.2)) -> pd.DataFrame:
+def load_main_dfs(data_loader_config, train_val_split = (0.8, 0.2)) -> pd.DataFrame:
     try:
+        train_sample_count = data_loader_config.SUBSET_SAMPLE_COUNT
+        
         logger = get_logger("main_df_loader.log")
         train_csv_pd = pd.read_csv(Paths.TRAIN_CSV)
         test_csv_pd = pd.read_csv(Paths.TEST_CSV)
@@ -40,6 +43,15 @@ def load_main_dfs(train_sample_count: int, train_val_split = (0.8, 0.2)) -> pd.D
             
         train_df, val_df = train_test_split(sampled_train_csv_pd, test_size=train_val_split[1], random_state=42)
         
+        if (data_loader_config.FILTER_BY_AGREEMENT):
+          train_df = filter_by_agreement(train_df, data_loader_config.FILTER_BY_AGREEMENT_MIN)
+          if (data_loader_config.FILTER_BY_AGREEMENT_ON_VAL):
+            val_df = filter_by_agreement(val_df, data_loader_config.FILTER_BY_AGREEMENT_MIN)
+        
+        if (data_loader_config.FILTER_BY_ANNOTATOR):
+          train_df = filter_by_annotators(train_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX)
+          if (data_loader_config.FILTER_BY_ANNOTATOR_ON_VAL):
+            val_df = filter_by_annotators(val_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX)
         test_df = samples_test_csv_pd
 
         return train_df, val_df, test_df

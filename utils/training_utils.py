@@ -1,4 +1,4 @@
-import logging
+
 import os
 import torch
 import numpy as np
@@ -9,10 +9,11 @@ from generics import Generics, Paths
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
-
+from tqdm import tqdm
+from utils.general_utils import AverageMeter, get_logger, timeSince
+from torch.optim.lr_scheduler import OneCycleLR
 # Configure logger
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 def train(train_dataset, val_dataset, model, tensorboard_prefix: str = "all"):
     """
@@ -56,9 +57,18 @@ def train_loop(
         model_config = model.config
         criterion = nn.KLDivLoss(reduction=model_config.KLDIV_REDUCTION)
         optimizer = _configure_optimizer(model, model_config)
-        scheduler = _configure_scheduler(optimizer, model_config)
-
         train_loader = train_dataset.get_torch_data_loader()
+        scheduler = OneCycleLR(
+            optimizer,
+            max_lr=1e-3,
+            epochs=model_config.EPOCHS,
+            steps_per_epoch=len(train_loader),
+            pct_start=0.05,
+            anneal_strategy="cos",
+            final_div_factor=100,
+        )
+
+        
         val_loader = val_dataset.get_torch_data_loader()
 
         for epoch in range(model_config.EPOCHS):
@@ -73,7 +83,7 @@ def train_loop(
                 model.device,
                 writer
             )
-            avg_val_loss = _valid_epoch(val_loader, model, criterion, model.device, writer, epoch)
+            avg_val_loss, _ = _valid_epoch(val_loader, model, criterion, model.device, writer, epoch)
             _log_epoch_results(
                 epoch,
                 avg_train_loss,
@@ -190,34 +200,47 @@ def _train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, de
     model.train()  # Set the model to training mode
     total_loss = 0
     total_batches = len(train_loader)
+    config = model.config
+    start = end = time.time()
+    scaler = torch.cuda.amp.GradScaler(enabled=config.AMP)
+    losses = AverageMeter()
     i = 0
-    for batch_idx, (inputs, targets) in enumerate(train_loader):
-        inputs, targets = inputs.to(device), targets.to(device)
+     # ========== ITERATE OVER TRAIN BATCHES ============
+    with tqdm(train_loader, unit="train_batch", desc='Train') as tqdm_train_loader:
+        for step, (X, y) in enumerate(tqdm_train_loader):
+            X = X.to(device)
+            y = y.to(device)
+            batch_size = y.size(0)
+            with torch.cuda.amp.autocast(enabled=config.AMP):
+                y_preds = model(X) 
+                loss = criterion(F.log_softmax(y_preds, dim=1), y)
+            if config.GRADIENT_ACCUMULATION_STEPS > 1:
+                loss = loss / config.GRADIENT_ACCUMULATION_STEPS
+            losses.update(loss.item(), batch_size)
+            scaler.scale(loss).backward()
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.MAX_GRAD_NORM)
 
-        optimizer.zero_grad()  # Reset gradients to zero
+            if (step + 1) % config.GRADIENT_ACCUMULATION_STEPS == 0:
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
+                scheduler.step()
+            end = time.time()
 
-        # Forward pass
-        with torch.cuda.amp.autocast(enabled=model.config.AMP):
-            outputs = model(inputs)
-            outputs = torch.nn.functional.log_softmax(
-                outputs, dim=1
-            )  # Ensure log probabilities
-            loss = criterion(outputs, targets)
+            # ========== LOG INFO ==========
+            if step % config.PRINT_FREQ == 0 or step == (len(train_loader)-1):
+                print('Epoch: [{0}][{1}/{2}] '
+                      'Elapsed {remain:s} '
+                      'Loss: {loss.avg:.4f} '
+                      'Grad: {grad_norm:.4f}  '
+                      'LR: {lr:.8f}  '
+                      .format(epoch+1, step, len(train_loader), 
+                              remain=timeSince(start, float(step+1)/len(train_loader)),
+                              loss=losses,
+                              grad_norm=grad_norm,
+                              lr=scheduler.get_last_lr()[0]))
 
-        # Backward pass and optimization
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item()
-
-        # Update learning rate
-        scheduler.step()
-        writer.add_scalar("Loss/Train", loss.item(), i + total_batches*epoch)
-        
-        i += 1
-
-    average_loss = total_loss / total_batches
-    return average_loss
+    return losses.avg
 
 
 def _valid_epoch(val_loader, model, criterion, device, writer, epoch=0):
@@ -233,32 +256,39 @@ def _valid_epoch(val_loader, model, criterion, device, writer, epoch=0):
     Returns:
         float: Average validation loss for the epoch.
     """
-    model.eval()  # Set the model to evaluation mode
-    total_loss = 0
-    total_batches = len(val_loader)
-    i = 0
-    with torch.no_grad():  # Disable gradient computation
-        for batch_idx, (inputs, targets) in enumerate(val_loader):
-            inputs, targets = inputs.to(device), targets.to(device)
+    model.eval()
+    softmax = nn.Softmax(dim=1)
+    losses = AverageMeter()
+    config = model.config
+    prediction_dict = {}
+    preds = []
+    start = end = time.time()
+    with tqdm(val_loader, unit="valid_batch", desc='Validation') as tqdm_valid_loader:
+        for step, (X, y) in enumerate(tqdm_valid_loader):
+            X = X.to(device)
+            y = y.to(device)
+            batch_size = y.size(0)
+            with torch.no_grad():
+                y_preds = model(X)
+                loss = criterion(F.log_softmax(y_preds, dim=1), y)
+            if config.GRADIENT_ACCUMULATION_STEPS > 1:
+                loss = loss / config.GRADIENT_ACCUMULATION_STEPS
+            losses.update(loss.item(), batch_size)
+            y_preds = softmax(y_preds)
+            preds.append(y_preds.to('cpu').numpy())
+            end = time.time()
 
-            # Forward pass
-            outputs = model(inputs)
-            outputs = torch.nn.functional.log_softmax(outputs + 1e-6, dim=1)
-            loss = criterion(outputs, targets)
-
-            if loss.item() < 0:  # Add a check for negative loss
-              logger.warning(f"Negative loss encountered: {loss.item()}")
-              logger.warning(f"Outputs: {outputs}")
-              logger.warning(f"Targets: {targets}")
-            
-            total_loss += loss.item()
-            writer.add_scalar("Loss/Validation", loss.item(), i + total_batches*epoch)
-            
-            i += 1
-            # Additional operations for metrics or logging can be added here
-
-    average_loss = total_loss / total_batches
-    return average_loss
+            # ========== LOG INFO ==========
+            if step % config.PRINT_FREQ == 0 or step == (len(val_loader)-1):
+                print('EVAL: [{0}/{1}] '
+                      'Elapsed {remain:s} '
+                      'Loss: {loss.avg:.4f} '
+                      .format(step, len(val_loader),
+                              remain=timeSince(start, float(step+1)/len(val_loader)),
+                              loss=losses))
+                
+    prediction_dict["predictions"] = np.concatenate(preds)
+    return losses.avg, prediction_dict
 
 
 def _log_epoch_results(epoch, avg_train_loss, avg_val_loss, model, dataset_name):
@@ -276,7 +306,6 @@ def _log_epoch_results(epoch, avg_train_loss, avg_val_loss, model, dataset_name)
     Returns:
         None
     """
-    logger = logging.getLogger(__name__)
     logger.info(f"Average Training Loss: {avg_train_loss:.4f}")
     logger.info(f"Average Validation Loss: {avg_val_loss:.4f}")
 

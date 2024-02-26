@@ -3,8 +3,11 @@ class BaseModelConfig:
     KLDIV_REDUCTION = "batchmean"
     OPTIMIZER = "adam"
     WEIGHT_DECAY = 0
-    LEARNING_RATE = 0.0001
+    LEARNING_RATE = 0.1
     SCHEDULER = "CosineAnnealingLR"
+    USE_KAGGLE_SPECTROGRAMS = True
+    USE_EEG_SPECTROGRAMS = True
+    GRADIENT_ACCUMULATION_STEPS = 1
     T_MAX = 10
     NUM_FROZEN_LAYERS = 32
     MAX_GRAD_NORM = 1000
@@ -15,6 +18,8 @@ class BaseModelConfig:
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         cls.NAME = cls.__name__
+
+
 
 
 class EfficientNetB0Config_Big(BaseModelConfig):
@@ -35,6 +40,23 @@ class EfficientNetB0Config_Big_Weight_Decay(BaseModelConfig):
     FREEZE = False
     EPOCHS = 60
     WEIGHT_DECAY = 0.01
+    
+    
+class EfficientNetB0Config_Big_Weight_Decay_Only_Custom_spectrograms(BaseModelConfig):
+    GRADIENT_ACCUMULATION_STEPS = 1
+    MODEL = "tf_efficientnet_b0"
+    USE_KAGGLE_SPECTROGRAMS = False
+    FREEZE = False
+    EPOCHS = 60
+    WEIGHT_DECAY = 0.01
+    
+class EfficientNetB0Config_Big_Weight_Decay_FROZEN_32(BaseModelConfig):
+    GRADIENT_ACCUMULATION_STEPS = 1
+    MODEL = "tf_efficientnet_b0"
+    FREEZE = True
+    NUM_FROZEN_LAYERS = 32
+    EPOCHS = 60
+    WEIGHT_DECAY = 0.01
 
 class EfficientNetB1Config_Big_Weight_Decay(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
@@ -42,6 +64,9 @@ class EfficientNetB1Config_Big_Weight_Decay(BaseModelConfig):
     FREEZE = False
     EPOCHS = 60
     WEIGHT_DECAY = 0.01
+    
+    
+  
 
 
 MODEL_GRID_SEARCH = [EfficientNetB0Config_Big, EfficientNetB1Config_Big, EfficientNetB0Config_Big_Weight_Decay, EfficientNetB1Config_Big_Weight_Decay]
