@@ -151,5 +151,5 @@ class Config_Normalize_Group_Raw_ICA(BaseDataConfig):
     APPLY_ICA_RAW_EEG = True
     USE_PRELOADED_EEG_SPECTROGRAMS = False
 
- # SmallBaseConfig, SmallConfig_Normalize, SmallConfig_EnhancedMSPCA,SmallConfig_Raw_ICA,  SmallConfig_Normalize_Indiv, SmallConfig_Normalize_Indiv_Raw_MSPCA, SmallConfig_Normalize_Indiv_Raw_ICA, SmallConfig_Normalize_Indiv_Raw_MSPCA, SmallConfig_Normalize_Indiv_Raw_ICA, 
-DATASET_GRID_SEARCH = [SmallConfig_Normalize_Group_Raw_ICA]
+
+DATASET_GRID_SEARCH = [ ExtremelySmallBaseConfig, SmallBaseConfig, SmallConfig_ICA_Normalize, SmallConfig_MSPCA, SmallConfig_Normalize_MSPCA, SmallConfig_ICA_MSPCA, SmallConfig_AllFeatures, SmallConfig_Normalize, SmallConfig_EnhancedICA, SmallConfig_EnhancedMSPCA, SmallConfig_ICA, SmallConfig_MSPCA_Enhanced, ThousandSamplesBaseConfig, ThousandSamplesBaseConfig_Normalize, ThousandSamplesBaseConfig_EnhancedMSPCA, SmallConfig_Normalize_Group, SmallConfig_Normalize_Group_Raw_MSPCA, SmallConfig_Normalize_Group_Raw_ICA, SmallConfig_Raw_MSPCA, SmallConfig_Raw_ICA, Config_Normalize_Group_Raw_ICA]

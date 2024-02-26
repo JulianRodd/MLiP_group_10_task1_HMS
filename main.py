@@ -5,6 +5,7 @@ from generics import Paths
 from models.CustomModel import CustomModel
 from models.custom_model_configs import EfficientNetB0Config_Big
 from utils.general_utils import get_logger
+from utils.grid_search_utils import grid_search
 from utils.inference_utils import perform_inference
 from utils.loader_utils import load_main_dfs
 from utils.training_utils import train
@@ -35,6 +36,7 @@ def main():
     modelDir = f"{Paths.BEST_MODEL_CHECKPOINTS}/best_{model_config.MODEL}_{model_config.NAME}_{data_loader_config.NAME}.pth"
     
     perform_inference(test_dataset, model, modelDir)
+    grid_search("Test different models", 3)
 
 if __name__ == "__main__":
     main()
