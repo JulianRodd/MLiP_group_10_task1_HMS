@@ -2,7 +2,6 @@ import os
 import torch
 
 class Paths:
-    CACHE_DIR = "./data/cache/"
     PRE_LOADED_EEGS = "./data/kaggle/input/brain-eeg-spectrograms/eeg_specs.npy"
     PRE_LOADED_SPECTROGRAMS = "./data/kaggle/input/brain-spectrograms/specs.npy"
     TRAIN_CSV = (
@@ -20,7 +19,8 @@ class Paths:
 
     OTHER_MODEL_CHECKPOINTS = "./checkpoints/other_models/"
     BEST_MODEL_CHECKPOINTS = "./checkpoints/best_models/"
-    CACHE_PATH = "./data/cache/"
+    CACHE_PATH_READ = "./data/cache/"
+    CACHE_PATH_WRITE = "./data/cache/"
     TENSORBOARD = "./tensorboard/"
     TENSORBOARD_MODELS = "./tensorboard/models/"
     TENSORBOARD_TRAINING = "./tensorboard/training/"

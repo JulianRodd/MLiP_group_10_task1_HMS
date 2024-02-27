@@ -26,17 +26,19 @@ def train(train_dataset, val_dataset, model, tensorboard_prefix: str = "all"):
     """
     oof_df = pd.DataFrame()
     preds, actual = train_loop(train_dataset, val_dataset, model, tensorboard_prefix)
-
     # Check and reshape preds if necessary
     if len(preds.shape) == 1 or preds.shape[1] == 1:
         preds = preds.reshape(-1, len(Generics.LABEL_COLS))
 
+  
+    
     preds_df = pd.DataFrame(preds, columns=Generics.LABEL_COLS)
+    
     actual_df = pd.DataFrame(actual, columns=Generics.TARGET_PREDS)
-
+    
     _oof_df = pd.concat([actual_df, preds_df], axis=1)
     oof_df = pd.concat([oof_df, _oof_df]).reset_index(drop=True)
-  
+    
     return oof_df
 
 
@@ -60,7 +62,7 @@ def train_loop(
         train_loader = train_dataset.get_torch_data_loader()
         scheduler = OneCycleLR(
             optimizer,
-            max_lr=1e-3,
+            max_lr=model_config.MAX_LEARNING_RATE_SCHEDULERER,
             epochs=model_config.EPOCHS,
             steps_per_epoch=len(train_loader),
             pct_start=0.05,
@@ -153,32 +155,6 @@ def _configure_optimizer(model, config):
 
     return optimizer
 
-
-def _configure_scheduler(optimizer, config):
-    """
-    Configures the learning rate scheduler for the optimizer based on the provided configuration.
-
-    Args:
-        optimizer (torch.optim.Optimizer): The optimizer for which the scheduler will be configured.
-        config (object): A configuration object containing scheduler settings.
-
-    Returns:
-        torch.optim.lr_scheduler: Configured learning rate scheduler.
-    """
-    scheduler_type = config.SCHEDULER.lower()
-
-    if scheduler_type == "cosineannealinglr":
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=config.T_MAX, eta_min=config.ETA_MIN
-        )
-    elif scheduler_type == "steplr":
-        scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer, step_size=config.STEP_SIZE, gamma=config.GAMMA
-        )
-    else:
-        raise ValueError(f"Unsupported scheduler type: {config.SCHEDULER}")
-
-    return scheduler
 
 
 def _train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, device, writer):
@@ -275,6 +251,7 @@ def _valid_epoch(val_loader, model, criterion, device, writer, epoch=0):
                 loss = loss / config.GRADIENT_ACCUMULATION_STEPS
             losses.update(loss.item(), batch_size)
             y_preds = softmax(y_preds)
+            print(losses.avg)
             preds.append(y_preds.to('cpu').numpy())
             end = time.time()
 

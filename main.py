@@ -1,9 +1,9 @@
 
 from datasets.data_loader import CustomDataset
-from datasets.data_loader_configs import BaseConfig_Train_Annotator_Agreement, Config_Normalize_Group_Raw_ICA, SmallBaseConfig_Train_Annotator_Agreement, SmallConfig_Normalize_Group_Raw_ICA
+from datasets.data_loader_configs import BaseConfig_Train_Annotator_Agreement, Config_Normalize_Group_Raw_ICA, Config_Normalize_Group_Raw_MSPCA, SmallBaseConfig_Train_Annotator_Agreement, SmallConfig_Normalize_Group_Raw_ICA, ExtremelySmallBaseConfig
 from generics import Paths
 from models.CustomModel import CustomModel
-from models.custom_model_configs import EfficientNetB0Config_Big, EfficientNetB0Config_Big_Weight_Decay_FROZEN_32, EfficientNetB0Config_Big_Weight_Decay_Only_Custom_spectrograms
+from models.custom_model_configs import BaseModelConfig, EfficientNetB0Config_Big, EfficientNetB0Config_Big_Weight_Decay_FROZEN_32, EfficientNetB0Config_Big_Weight_Decay_Only_Custom_spectrograms
 from utils.data_preprocessing_utils import filter_by_agreement, filter_by_annotators
 from utils.general_utils import get_logger
 from utils.grid_search_utils import grid_search
@@ -15,6 +15,7 @@ def main():
     logger = get_logger("main")
     
     data_loader_config = Config_Normalize_Group_Raw_ICA
+
     model_config = EfficientNetB0Config_Big_Weight_Decay_Only_Custom_spectrograms
     
     logger.info(f"Training model {model_config.NAME} with data loader {data_loader_config.NAME}")

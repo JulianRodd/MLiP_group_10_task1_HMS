@@ -69,7 +69,7 @@ class CustomDataset(Dataset):
             self.batch_size = config.BATCH_SIZE_TRAIN
 
         cache_file = self.generate_cache_filename(self.config.SUBSET_SAMPLE_COUNT, mode)
-        if os.path.exists(cache_file) and cache:
+        if os.path.exists(f"{Paths.CACHE_PATH_READ}{cache_file}") and cache:
             self.logger.info(f"Loading dataset from cache: {cache_file}")
             self.load_from_cache(cache_file)
         else:
@@ -97,9 +97,6 @@ class CustomDataset(Dataset):
             else:
                 self.spectrograms = load_spectrograms(main_df=self.main_df, mode=self.mode)
                 
-            
-            if self.mode == "train" and config.ONE_CROP_PER_PERSON:
-                self.main_df = create_non_overlapping_eeg_crops(self.main_df, self.label_cols)
             if cache:
               self.cache_data(cache_file)
         
@@ -117,7 +114,7 @@ class CustomDataset(Dataset):
             str: Filename for caching the dataset.
         """
         config_summary = f"{self.config.NAME}_{subset_sample_count}_{mode}"
-        return os.path.join(Paths.CACHE_PATH, f"{config_summary}.npz")
+        return f"{config_summary}.npz"
 
     def cache_data(self, cache_file: str):
         """
@@ -126,7 +123,7 @@ class CustomDataset(Dataset):
         Args:
             cache_file (str): The file path where the dataset will be cached.
         """
-        np.savez(cache_file, 
+        np.savez(f"{Paths.CACHE_PATH_WRITE}{cache_file}", 
                  main_df=self.main_df.to_records(index=False),
                  spectrograms=self.spectrograms,
                  eeg_spectrograms=self.eeg_spectrograms)
@@ -139,7 +136,7 @@ class CustomDataset(Dataset):
         Args:
             cache_file (str): The file path from which the dataset will be loaded.
         """
-        cached_data = np.load(cache_file, allow_pickle=True)
+        cached_data = np.load(f"{Paths.CACHE_PATH_READ}{cache_file}", allow_pickle=True)
         self.spectrograms = cached_data['spectrograms'].item()
         self.eeg_spectrograms = cached_data['eeg_spectrograms'].item()
         self.label_cols = Generics.LABEL_COLS

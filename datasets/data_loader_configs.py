@@ -1,7 +1,6 @@
 class BaseDataConfig:
     NAME = "BaseDataConfig"
     # Common parameters across all configs
-    ONE_CROP_PER_PERSON = True
     USE_WAVELET: bool = None
     BATCH_SIZE_TRAIN = 64
     BATCH_SIZE_TEST = 16
@@ -200,6 +199,12 @@ class Config_Normalize_Group_Raw_ICA(BaseDataConfig):
     NORMALIZE_EEG_SPECTROGRAMS = True
     NORMALIZE_INDIVIDUALLY = False
     APPLY_ICA_RAW_EEG = True
+    USE_PRELOADED_EEG_SPECTROGRAMS = False
+
+class Config_Normalize_Group_Raw_MSPCA(BaseDataConfig):
+    NORMALIZE_EEG_SPECTROGRAMS = True
+    NORMALIZE_INDIVIDUALLY = False
+    APPLY_MSPCA_RAW_EEG = True
     USE_PRELOADED_EEG_SPECTROGRAMS = False
 
 

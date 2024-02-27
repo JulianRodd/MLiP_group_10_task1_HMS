@@ -28,12 +28,14 @@ def load_main_dfs(data_loader_config, train_val_split = (0.8, 0.2)) -> pd.DataFr
         
         logger = get_logger("main_df_loader.log")
         train_csv_pd = pd.read_csv(Paths.TRAIN_CSV)
+        prepared_train_df = prepare_train_df(train_csv_pd)
+        
         test_csv_pd = pd.read_csv(Paths.TEST_CSV)
-        train_csv_pd= train_csv_pd[~train_csv_pd["eeg_id"].isin(Generics.OPT_OUT_EEG_ID)]
+        prepared_train_df= prepared_train_df[~prepared_train_df["eeg_id"].isin(Generics.OPT_OUT_EEG_ID)]
         test_csv_pd= test_csv_pd[~test_csv_pd["eeg_id"].isin(Generics.OPT_OUT_EEG_ID)]
         
         # Sample one record from each unique patient
-        sampled_train_csv_pd = train_csv_pd.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
+        sampled_train_csv_pd = prepared_train_df.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
         samples_test_csv_pd = test_csv_pd.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
       
         if train_sample_count == 0:
@@ -60,7 +62,38 @@ def load_main_dfs(data_loader_config, train_val_split = (0.8, 0.2)) -> pd.DataFr
         logger.error(f"Error loading data: {e}")
         raise
       
+def prepare_train_df(df: pd.DataFrame) -> pd.DataFrame:
+    train_df = df.groupby('eeg_id')[['spectrogram_id','spectrogram_label_offset_seconds']].agg({
+    'spectrogram_id':'first',
+    'spectrogram_label_offset_seconds':'min'
+    })
+    train_df.columns = ['spectrogram_id','min']
 
+    aux = df.groupby('eeg_id')[['spectrogram_id','spectrogram_label_offset_seconds']].agg({
+        'spectrogram_label_offset_seconds':'max'
+    })
+    train_df['max'] = aux
+
+    aux = df.groupby('eeg_id')[['patient_id']].agg('first')
+    train_df['patient_id'] = aux
+
+    aux = df.groupby('eeg_id')[Generics.LABEL_COLS].agg('sum')
+    for label in Generics.LABEL_COLS:
+        train_df[label] = aux[label].values
+        
+    y_data = train_df[Generics.LABEL_COLS].values
+    y_data = y_data / y_data.sum(axis=1,keepdims=True)
+    train_df[Generics.LABEL_COLS] = y_data
+    
+    aux = df.groupby('eeg_id')[['expert_consensus']].agg('first')
+    train_df['target'] = aux
+
+    train_df = train_df.reset_index()
+    print('Train non-overlapp eeg_id shape:', train_df.shape )
+    train_df.head()
+    return train_df
+    
+    
 def load_eeg_data(main_df: pd.DataFrame, mode: str) -> Dict[int, pd.DataFrame]:
     """
     Load EEG data for the EEG IDs present in the provided DataFrame.

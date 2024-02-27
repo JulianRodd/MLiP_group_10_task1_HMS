@@ -4,6 +4,7 @@ class BaseModelConfig:
     OPTIMIZER = "adam"
     WEIGHT_DECAY = 0
     LEARNING_RATE = 0.1
+    MAX_LEARNING_RATE_SCHEDULERER = 0.01
     SCHEDULER = "CosineAnnealingLR"
     USE_KAGGLE_SPECTROGRAMS = True
     USE_EEG_SPECTROGRAMS = True
