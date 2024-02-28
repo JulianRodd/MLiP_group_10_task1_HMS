@@ -50,7 +50,10 @@ class CustomModel(nn.Module):
                 )
         elif self.config.MODEL.startswith('shufflenet'):
             self.model.num_features = 1024
-            return nn.Linear(self.model.num_features, self.num_classes)
+            return nn.Sequential(
+                    nn.Flatten(),
+                    nn.Linear(self.model.num_features, self.num_classes)
+                    )
         
     def set_feature_layers(self):
         if self.config.MODEL.startswith('tf_'):
