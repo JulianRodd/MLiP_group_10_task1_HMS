@@ -21,7 +21,11 @@ class BaseModelConfig:
         cls.NAME = cls.__name__
 
 
-
+class ShuffleNetBase(BaseModelConfig):
+    GRADIENT_ACCUMULATION_STEPS = 1
+    MODEL = 'shufflenet_v2_x1_0'
+    FREEZE = False
+    EPOCHS = 10 
 
 class EfficientNetB0Config_Big(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1

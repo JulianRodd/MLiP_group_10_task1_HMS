@@ -20,29 +20,47 @@ class CustomModel(nn.Module):
         self.logger.info(f"Using device: {device}")
         self.device = device
 
+        self.num_classes = num_classes
         self.config = config
         self.model = timm.create_model(
             config.MODEL,
             pretrained=pretrained,
             drop_rate=0.1,
             drop_path_rate=0.2,
-        )
+        ) if config.MODEL.startswith('tf_')  else torch.hub.load('pytorch/vision:v0.10.0', 
+                                                                 config.MODEL, pretrained=True)
         if config.FREEZE:
             for i, (name, param) in enumerate(
                 list(self.model.named_parameters())[0 : config.NUM_FROZEN_LAYERS]
             ):
                 param.requires_grad = False
 
-        self.features = nn.Sequential(*list(self.model.children())[:-2])
-        self.custom_layers = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),
-            nn.Flatten(),
-            nn.Linear(self.model.num_features, num_classes),
-        )
+        self.features = self.set_feature_layers() 
+        self.custom_layers = self.set_custom_layers()
         self.writer = SummaryWriter(log_dir=os.path.join(Paths.TENSORBOARD_MODELS, f"{tensorboard_prefix}/{config.NAME}"))
         self.to(self.device)
         self.logger.info(f"{config.MODEL} initialized with config {config.NAME}")
-      
+    
+    def set_custom_layers(self):
+        if self.config.MODEL.startswith('tf_'):
+            return nn.Sequential(
+                nn.AdaptiveAvgPool2d(1),
+                nn.Flatten(),
+                nn.Linear(self.model.num_features, self.num_classes),
+                )
+        elif self.config.MODEL.startswith('shufflenet'):
+            self.model.num_features = 1024
+            return nn.Linear(self.model.num_features, self.num_classes)
+        
+    def set_feature_layers(self):
+        if self.config.MODEL.startswith('tf_'):
+            return nn.Sequential(*list(self.model.children())[:-2])
+
+        elif self.config.MODEL.startswith('shufflenet'):
+            return nn.Sequential(*list(self.model.children())[:-1])
+
+
+
 
     def log_model_parameters(self, step: int):
         """
