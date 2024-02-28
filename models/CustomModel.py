@@ -41,21 +41,13 @@ class CustomModel(nn.Module):
         self.to(self.device)
         self.logger.info(f"{config.MODEL} initialized with config {config.NAME}")
     
-    
+
     def set_custom_layers(self):
-        if self.config.MODEL.startswith('tf_'):
-            return nn.Sequential(
-                nn.AdaptiveAvgPool2d(1),
-                nn.Flatten(),
-                nn.Linear(self.model.num_features, self.num_classes),
-                )
-        elif self.config.MODEL.startswith('shufflenet'):
-            self.model.num_features = 1024
-            return nn.Sequential(
-                    nn.AdaptiveAvgPool2d(1),
-                    nn.Flatten(),
-                    nn.Linear(self.model.num_features, self.num_classes)
-                    )
+        return nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Flatten(),
+            nn.Linear(self.model.num_features, self.num_classes),
+            )
         
     def set_feature_layers(self):
         if self.config.MODEL.startswith('tf_'):
