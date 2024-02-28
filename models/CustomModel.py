@@ -43,10 +43,14 @@ class CustomModel(nn.Module):
     
 
     def set_custom_layers(self):
+        if self.config.MODEL.startswith('tf_'):
+            num_features = self.model.num_features
+        elif self.config.MODEL.startswith('shufflenet'):
+            num_features = 1024
         return nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
             nn.Flatten(),
-            nn.Linear(self.model.num_features, self.num_classes),
+            nn.Linear(num_features, self.num_classes),
             )
         
     def set_feature_layers(self):
