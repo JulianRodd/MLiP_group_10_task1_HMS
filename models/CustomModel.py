@@ -51,6 +51,7 @@ class CustomModel(nn.Module):
         elif self.config.MODEL.startswith('shufflenet'):
             self.model.num_features = 1024
             return nn.Sequential(
+                    nn.AdaptiveAvgPool2d(1),
                     nn.Flatten(),
                     nn.Linear(self.model.num_features, self.num_classes)
                     )
