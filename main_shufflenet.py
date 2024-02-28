@@ -36,7 +36,7 @@ def main():
     
     modelDir = f"{Paths.BEST_MODEL_CHECKPOINTS}/best_{model_config.MODEL}_{model_config.NAME}_{data_loader_config.NAME}.pth"
     
-    perform_inference(test_dataset, model, modelDir)
+    perform_inference(test_df, model, modelDir)
     # grid_search("Test different models", 3)
 
 if __name__ == "__main__":
