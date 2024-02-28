@@ -40,7 +40,7 @@ class CustomModel(nn.Module):
         self.writer = SummaryWriter(log_dir=os.path.join(Paths.TENSORBOARD_MODELS, f"{tensorboard_prefix}/{config.NAME}"))
         self.to(self.device)
         self.logger.info(f"{config.MODEL} initialized with config {config.NAME}")
-        print(self.custom_layers)
+    
     
     def set_custom_layers(self):
         if self.config.MODEL.startswith('tf_'):
