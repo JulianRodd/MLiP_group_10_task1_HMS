@@ -71,7 +71,7 @@ class CustomModel(nn.Module):
                 )
         
     def set_feature_layers(self):
-        if self.config.MODEL.startswith('tf_'):
+        if self.config.MODEL.startswith('tf_') or self.config.MODEL.startswith('resnet'):
             return nn.Sequential(*list(self.model.children())[:-2])
 
         elif self.config.MODEL.startswith('shufflenet'):
