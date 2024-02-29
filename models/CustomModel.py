@@ -53,7 +53,7 @@ class CustomModel(nn.Module):
         else: 
             raise NotImplementedError("Model not implemented - check model name.")
         
-        if getattr(self.config, 'large_classifier', False): # not all will have attribute so to not break it return False if attr does not exist
+        if getattr(self.config, 'LARGE_CLASSIFIER', False): # not all will have attribute so to not break it return False if attr does not exist
             return nn.Sequential(
                 nn.AdaptiveAvgPool2d(1),
                 nn.Flatten(),

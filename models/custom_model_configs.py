@@ -33,6 +33,13 @@ class ResNetBase(BaseModelConfig):
     FREEZE = False
     EPOCHS = 10 
 
+class ResNetBase_LargeCF(BaseModelConfig):
+    GRADIENT_ACCUMULATION_STEPS = 1
+    MODEL = 'resnet50'
+    FREEZE = False
+    EPOCHS = 10 
+    LARGE_CLASSIFIER = True
+
 class EfficientNetB0Config_Big(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
     MODEL = "tf_efficientnet_b0"
