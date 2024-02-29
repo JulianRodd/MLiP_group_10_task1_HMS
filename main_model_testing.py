@@ -3,7 +3,7 @@ from datasets.data_loader import CustomDataset
 from datasets.data_loader_configs import SmallBaseConfig
 from generics import Paths
 from models.CustomModel import CustomModel
-from models.custom_model_configs import ShuffleNetBase
+from models.custom_model_configs import ShuffleNetTest, ResNetBase  
 from utils.general_utils import get_logger
 from utils.inference_utils import perform_inference
 from utils.loader_utils import load_main_dfs
@@ -14,7 +14,7 @@ def main():
     
     data_loader_config = SmallBaseConfig
 
-    model_config = ShuffleNetBase
+    model_config = ResNetBase #ShuffleNetBase
     
     logger.info(f"Training model {model_config.NAME} with data loader {data_loader_config.NAME}")
     
