@@ -43,17 +43,32 @@ class CustomModel(nn.Module):
     
 
     def set_custom_layers(self):
-
-        if self.config.MODEL.startswith('tf_') or self.config.MODEL.startswith('resnet'):
+        # this should probs become a dict once we know which sizes we are going to use 
+        if self.config.MODEL.startswith('tf_'):
             num_features = self.model.num_features
         elif self.config.MODEL.startswith('shufflenet'):
             num_features = 1024 # need to make this better 
-
-        return nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),
-            nn.Flatten(),
-            nn.Linear(num_features, self.num_classes),
+        elif self.config.MODEL.startswith('resnet'):
+            num_features = 2048
+        else: 
+            raise NotImplementedError("Model not implemented - check model name.")
+        
+        if getattr(self.config, 'large_classifier', False): # not all will have attribute so to not break it return False if attr does not exist
+            return nn.Sequential(
+                nn.AdaptiveAvgPool2d(1),
+                nn.Flatten(),
+                nn.Linear(num_features, 256),
+                nn.BatchNorm1d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+                nn.ReLU(inplace=True),
+                nn.Linear(256, self.num_classes),
             )
+        
+        else:
+            return nn.Sequential(
+                nn.AdaptiveAvgPool2d(1),
+                nn.Flatten(),
+                nn.Linear(num_features, self.num_classes),
+                )
         
     def set_feature_layers(self):
         if self.config.MODEL.startswith('tf_'):
