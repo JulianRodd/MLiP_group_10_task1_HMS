@@ -9,7 +9,11 @@ from prettytable import PrettyTable
 from generics import Paths, Generics
 from datasets.data_loader_configs import BaseDataConfig
 from utils.general_utils import get_logger
-from utils.feature_extraction_utils import get_hfda, get_psd
+from utils.feature_extraction_utils import get_hfda, get_psd, get_dfa
+
+
+FEATURES = ["desc", "hfda", "psd", "dfa"]
+
 
 class CustomRawDataset():
     """
@@ -24,7 +28,6 @@ class CustomRawDataset():
         main_df (pd.DataFrame): Main dataframe holding the dataset information.
         label_cols (List[str]): List of label column names in the dataframe.
     """
-
     def __init__(
         self,
         config: BaseDataConfig,
@@ -57,6 +60,10 @@ class CustomRawDataset():
         self.features_per_sample: np.ndarray | None = None
         self.lbl_probabilities: np.ndarray | None = None
         self.subsample_eeg_ids: np.ndarray | None = None
+
+        invalid_features = set(feature_list).difference(set(FEATURES))
+        if invalid_features:
+            ValueError(f"Invalid features were given: {invalid_features}. Accepted features are: {FEATURES}")
 
         cache_file = self.generate_cache_filename(subset_sample_count, mode)
         if os.path.exists(cache_file) and cache:
@@ -157,10 +164,15 @@ class CustomRawDataset():
         if "psd" in self.feature_list:
             feature_dfs.append(get_psd(eeg=eeg_np, eeg_columns=eeg_columns))
         
+        if "dfa" in self.feature_list:
+            feature_dfs.append(get_dfa(eeg=eeg_np, eeg_columns=eeg_columns))
+
         feature_df = pd.concat(feature_dfs)
         # feature_df.insert(len(eeg_columns), "EKG", ekg)
         feature_df = pd.concat([feature_df, one_hot_df[eeg_columns]])
         feature_array = np.asarray(feature_df).flatten("F")
+
+
 
         return feature_array
     
