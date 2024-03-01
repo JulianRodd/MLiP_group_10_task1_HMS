@@ -39,6 +39,7 @@ class ResNetBase_LargeCF(BaseModelConfig):
     FREEZE = False
     EPOCHS = 10 
     LARGE_CLASSIFIER = True
+    WEIGHT_DECAY = 0.01
 
 class EfficientNetB0Config_Big(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
