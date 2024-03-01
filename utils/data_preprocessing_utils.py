@@ -1,6 +1,8 @@
 import pandas as pd
-
+import numpy as np
 from utils.general_utils import get_logger
+from generics import Generics
+
 
 def create_non_overlapping_eeg_crops(df: pd.DataFrame, label_cols: list) -> pd.DataFrame:
     """
@@ -51,3 +53,36 @@ def create_non_overlapping_eeg_crops(df: pd.DataFrame, label_cols: list) -> pd.D
     except Exception as e:
         logger.error(f"Error in preprocessing data: {e}")
         raise
+
+
+def filter_by_agreement(df:pd.DataFrame, min:float):
+    '''
+    Takes train/test df
+    Returns df with rows having more than min agreement (min in %). 
+    '''
+    
+    max_votes = df[Generics.LABEL_COLS].max(axis=1)
+    total_votes = df[Generics.LABEL_COLS].sum(axis=1)
+    min /= 100
+    bool_filter = (max_votes/total_votes)>min
+
+    return df[bool_filter]
+
+
+def filter_by_annotators(df:pd.DataFrame, min:int, max:int=np.inf, n_annot=None):
+    '''
+    Takes train/test df, min and max number of annotators
+    Returns df with rows having more than or min number of annotators and less than max 
+    based on vote columns or n_annot, if provided 
+    '''
+
+    if n_annot is not None: 
+        total_votes = n_annot
+    else:
+        total_votes = df[Generics.LABEL_COLS].sum(axis=1)
+    filter_min = total_votes >=min 
+    filter_max = total_votes < max
+
+    bool_filter = filter_min & filter_max
+
+    return df[bool_filter]

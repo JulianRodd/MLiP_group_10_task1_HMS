@@ -5,28 +5,29 @@ import matplotlib.pyplot as plt
 from utils.signal_preprocessing_utils import denoise
 from utils.general_utils import get_logger
 
+import pandas as pd
+import numpy as np
+import librosa
+from utils.general_utils import get_logger
 
-def generate_spectrogram_from_eeg(
-    parquet_path: str, feats, use_wavelet: bool, display: bool = False, display_eeg_id: int = 0
-) -> np.ndarray:
+def generate_eeg_from_parquet(parquet_path: str) -> pd.DataFrame:
     """
-    Generates a spectrogram from EEG data stored in a Parquet file.
+    Reads EEG data from a Parquet file.
 
     Args:
         parquet_path (str): Path to the Parquet file containing EEG data.
-        display (bool): If True, displays the spectrogram and EEG signals. Defaults to False.
-        display_eeg_id (int): EEG ID to display in the plot title. Used only if display is True.
 
     Returns:
-        np.ndarray: A numpy array representing the generated spectrogram.
+        pd.DataFrame: DataFrame containing EEG data.
 
     Raises:
         FileNotFoundError: If the specified Parquet file does not exist.
-        Exception: For issues encountered during the processing of EEG data.
+        Exception: For issues encountered during reading the Parquet file.
     """
-    logger = get_logger("utils/generate_spectrogram_from_eeg")
+    logger = get_logger("utils/generate_eeg_from_parquet")
     try:
         eeg = pd.read_parquet(parquet_path)
+        return eeg
     except FileNotFoundError:
         logger.error(f"Parquet file not found: {parquet_path}")
         raise
@@ -34,9 +35,21 @@ def generate_spectrogram_from_eeg(
         logger.error(f"Error reading Parquet file: {e}")
         raise
 
+def generate_spectrogram_from_eeg(eeg_data, feats, use_wavelet: bool, display: bool = False) -> np.ndarray:
+    logger = get_logger("utils/generate_spectrogram_from_eeg")
     try:
-        middle = (len(eeg) - 10_000) // 2
-        eeg = eeg.iloc[middle : middle + 10_000]
+        # Validate feats list
+        if not all(len(sublist) == 5 for sublist in feats):
+            raise ValueError("Each sublist in feats must contain 5 column names")
+
+        # Validate columns in eeg_data
+        for sublist in feats:
+            for col in sublist:
+                if col not in eeg_data.columns:
+                    raise ValueError(f"Column '{col}' not found in eeg_data")
+                  
+        middle = (len(eeg_data) - 10_000) // 2
+        eeg = eeg_data.iloc[middle : middle + 10_000]
 
         img = np.zeros((128, 256, 4), dtype="float32")
         signals = []
@@ -51,7 +64,7 @@ def generate_spectrogram_from_eeg(
 
                 if use_wavelet:
                     x = denoise(
-                        x, wavelet=config.USE_WAVELET
+                        x, wavelet=use_wavelet
                     )  # denoise function should be imported or defined
 
                 signals.append(x)
@@ -76,12 +89,13 @@ def generate_spectrogram_from_eeg(
             img[:, :, k] /= 4.0
 
         if display:
-            _display_eeg_and_spectrogram(img, signals, display_eeg_id)
+            _display_eeg_and_spectrogram(img, signals, eeg_data["eeg_id"].values[0])
 
         return img
     except Exception as e:
         logger.error(f"Error processing EEG data: {e}")
         raise
+
 
 
 def _display_eeg_and_spectrogram(

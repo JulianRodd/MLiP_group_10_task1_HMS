@@ -1,4 +1,4 @@
-import logging
+
 import os
 import torch
 import numpy as np
@@ -9,12 +9,13 @@ from generics import Generics, Paths
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
-
+from tqdm import tqdm
+from utils.general_utils import AverageMeter, get_logger, timeSince
+from torch.optim.lr_scheduler import OneCycleLR
 # Configure logger
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
-def perform_cross_validation(train_dataset, val_dataset, model):
+def train(train_dataset, val_dataset, model, tensorboard_prefix: str = "all"):
     """
     Perform cross-validation training and validation.
 
@@ -22,61 +23,58 @@ def perform_cross_validation(train_dataset, val_dataset, model):
         train_dataset (CustomDataset): The training dataset.
         val_dataset (CustomDataset): The validation dataset.
         model (torch.nn.Module): The model to train.
-
-    Returns:
-        pd.DataFrame: DataFrame containing out-of-fold predictions.
     """
     oof_df = pd.DataFrame()
-    try:
-        for fold in range(model.config.FOLDS):
-            logger.info(f"Starting training for Fold {fold}")
-            preds, actual = train_loop(train_dataset, val_dataset, model, fold)
+    preds, actual = train_loop(train_dataset, val_dataset, model, tensorboard_prefix)
+    # Check and reshape preds if necessary
+    if len(preds.shape) == 1 or preds.shape[1] == 1:
+        preds = preds.reshape(-1, len(Generics.LABEL_COLS))
 
-            # Check and reshape preds if necessary
-            if len(preds.shape) == 1 or preds.shape[1] == 1:
-                preds = preds.reshape(-1, len(Generics.LABEL_COLS))
-
-            preds_df = pd.DataFrame(preds, columns=Generics.LABEL_COLS)
-            actual_df = pd.DataFrame(actual, columns=Generics.TARGET_PREDS)
-
-            _oof_df = pd.concat([actual_df, preds_df], axis=1)
-            oof_df = pd.concat([oof_df, _oof_df]).reset_index(drop=True)
-            
-            fold_result = get_result(_oof_df)
-            logger.info(f"========== Fold {fold} result: {fold_result} ==========")
-
-        cv_result = get_result(oof_df)
-        logger.info(f"========== CV Result: {cv_result} ==========")
-
-    except Exception as e:
-        logger.error(f"An error occurred during cross-validation: {e}")
-        raise
-
+  
+    
+    preds_df = pd.DataFrame(preds, columns=Generics.LABEL_COLS)
+    
+    actual_df = pd.DataFrame(actual, columns=Generics.TARGET_PREDS)
+    
+    _oof_df = pd.concat([actual_df, preds_df], axis=1)
+    oof_df = pd.concat([oof_df, _oof_df]).reset_index(drop=True)
+    
     return oof_df
 
 
 def train_loop(
-    train_dataset: CustomDataset, val_dataset: CustomDataset, model, fold: int
+    train_dataset: CustomDataset, val_dataset: CustomDataset, model, tensorboard_prefix: str = "all"
 ):
     preds = []
     actual = []
+    total_epochs = model.config.EPOCHS
+
     tb_run_path = os.path.join(
         Paths.TENSORBOARD_TRAINING,
-        f"{train_dataset.config.NAME}_{model.config.NAME}_fold_{fold}",
+        f"{tensorboard_prefix}/{train_dataset.config.NAME}_{model.config.NAME}/{train_dataset.config.NAME}_{model.config.NAME}",
     )
     writer = SummaryWriter(tb_run_path)
     try:
-        logger.info(f"========== Fold: {fold} training ==========")
         best_loss = np.inf
         model_config = model.config
         criterion = nn.KLDivLoss(reduction=model_config.KLDIV_REDUCTION)
         optimizer = _configure_optimizer(model, model_config)
-        scheduler = _configure_scheduler(optimizer, model_config)
-
         train_loader = train_dataset.get_torch_data_loader()
+        scheduler = OneCycleLR(
+            optimizer,
+            max_lr=model_config.MAX_LEARNING_RATE_SCHEDULERER,
+            epochs=model_config.EPOCHS,
+            steps_per_epoch=len(train_loader),
+            pct_start=0.05,
+            anneal_strategy="cos",
+            final_div_factor=100,
+        )
+
+        
         val_loader = val_dataset.get_torch_data_loader()
 
         for epoch in range(model_config.EPOCHS):
+            logger.info(f"Epoch {epoch + 1}/{total_epochs}")
             avg_train_loss = _train_epoch(
                 train_loader,
                 model,
@@ -85,24 +83,13 @@ def train_loop(
                 epoch,
                 scheduler,
                 model.device,
+                writer
             )
-            avg_val_loss = _valid_epoch(val_loader, model, criterion, model.device)
-
-            writer.add_scalar("Loss/Train", avg_train_loss, epoch)
-            writer.add_scalar("Loss/Validation", avg_val_loss, epoch)
-
-            # Save checkpoint after each epoch with fold information
-            checkpoint_name = f"{model_config.MODEL}_{model_config.NAME}_{train_dataset.config.NAME}_fold_{fold}_epoch_{epoch+1}_loss_{avg_val_loss:.4f}.pth"
-            torch.save(
-                model.state_dict(),
-                os.path.join(Paths.OTHER_MODEL_CHECKPOINTS, checkpoint_name),
-            )
-
+            avg_val_loss, _ = _valid_epoch(val_loader, model, criterion, model.device, writer, epoch)
             _log_epoch_results(
                 epoch,
                 avg_train_loss,
                 avg_val_loss,
-                fold,
                 model,
                 train_dataset.config.NAME,
             )
@@ -110,7 +97,7 @@ def train_loop(
             # Save the best model with fold information
             if avg_val_loss < best_loss:
                 best_loss = avg_val_loss
-                best_model_name = f"best_{model_config.MODEL}_{model_config.NAME}_{train_dataset.config.NAME}_fold_{fold}.pth"
+                best_model_name = f"best_{model_config.MODEL}_{model_config.NAME}_{train_dataset.config.NAME}.pth"
                 torch.save(
                     model.state_dict(),
                     os.path.join(Paths.BEST_MODEL_CHECKPOINTS, best_model_name),
@@ -169,34 +156,8 @@ def _configure_optimizer(model, config):
     return optimizer
 
 
-def _configure_scheduler(optimizer, config):
-    """
-    Configures the learning rate scheduler for the optimizer based on the provided configuration.
 
-    Args:
-        optimizer (torch.optim.Optimizer): The optimizer for which the scheduler will be configured.
-        config (object): A configuration object containing scheduler settings.
-
-    Returns:
-        torch.optim.lr_scheduler: Configured learning rate scheduler.
-    """
-    scheduler_type = config.SCHEDULER.lower()
-
-    if scheduler_type == "cosineannealinglr":
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=config.T_MAX, eta_min=config.ETA_MIN
-        )
-    elif scheduler_type == "steplr":
-        scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer, step_size=config.STEP_SIZE, gamma=config.GAMMA
-        )
-    else:
-        raise ValueError(f"Unsupported scheduler type: {config.SCHEDULER}")
-
-    return scheduler
-
-
-def _train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, device):
+def _train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, device, writer):
     """
     Handles the training of the model for one epoch.
 
@@ -215,34 +176,50 @@ def _train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, de
     model.train()  # Set the model to training mode
     total_loss = 0
     total_batches = len(train_loader)
+    config = model.config
+    start = end = time.time()
+    scaler = torch.cuda.amp.GradScaler(enabled=config.AMP)
+    losses = AverageMeter()
+    i = 0
+     # ========== ITERATE OVER TRAIN BATCHES ============
+    with tqdm(train_loader, unit="train_batch", desc='Train') as tqdm_train_loader:
+        for step, (X, y) in enumerate(tqdm_train_loader):
+            X = X.to(device)
+            y = y.to(device)
+            batch_size = y.size(0)
+            with torch.cuda.amp.autocast(enabled=config.AMP):
+                y_preds = model(X) 
+                loss = criterion(F.log_softmax(y_preds, dim=1), y)
+            if config.GRADIENT_ACCUMULATION_STEPS > 1:
+                loss = loss / config.GRADIENT_ACCUMULATION_STEPS
+            losses.update(loss.item(), batch_size)
+            scaler.scale(loss).backward()
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.MAX_GRAD_NORM)
 
-    for batch_idx, (inputs, targets) in enumerate(train_loader):
-        inputs, targets = inputs.to(device), targets.to(device)
+            if (step + 1) % config.GRADIENT_ACCUMULATION_STEPS == 0:
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
+                scheduler.step()
+            end = time.time()
 
-        optimizer.zero_grad()  # Reset gradients to zero
+            # ========== LOG INFO ==========
+            if step % config.PRINT_FREQ == 0 or step == (len(train_loader)-1):
+                print('Epoch: [{0}][{1}/{2}] '
+                      'Elapsed {remain:s} '
+                      'Loss: {loss.avg:.4f} '
+                      'Grad: {grad_norm:.4f}  '
+                      'LR: {lr:.8f}  '
+                      .format(epoch+1, step, len(train_loader), 
+                              remain=timeSince(start, float(step+1)/len(train_loader)),
+                              loss=losses,
+                              grad_norm=grad_norm,
+                              lr=scheduler.get_last_lr()[0]))
 
-        # Forward pass
-        with torch.cuda.amp.autocast(enabled=model.config.AMP):
-            outputs = model(inputs)
-            outputs = torch.nn.functional.log_softmax(
-                outputs, dim=1
-            )  # Ensure log probabilities
-            loss = criterion(outputs, targets)
-
-        # Backward pass and optimization
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item()
-
-        # Update learning rate
-        scheduler.step()
-
-    average_loss = total_loss / total_batches
-    return average_loss
+    return losses.avg
 
 
-def _valid_epoch(val_loader, model, criterion, device):
+def _valid_epoch(val_loader, model, criterion, device, writer, epoch=0):
     """
     Handles the validation of the model for one epoch.
 
@@ -255,27 +232,43 @@ def _valid_epoch(val_loader, model, criterion, device):
     Returns:
         float: Average validation loss for the epoch.
     """
-    model.eval()  # Set the model to evaluation mode
-    total_loss = 0
-    total_batches = len(val_loader)
+    model.eval()
+    softmax = nn.Softmax(dim=1)
+    losses = AverageMeter()
+    config = model.config
+    prediction_dict = {}
+    preds = []
+    start = end = time.time()
+    with tqdm(val_loader, unit="valid_batch", desc='Validation') as tqdm_valid_loader:
+        for step, (X, y) in enumerate(tqdm_valid_loader):
+            X = X.to(device)
+            y = y.to(device)
+            batch_size = y.size(0)
+            with torch.no_grad():
+                y_preds = model(X)
+                loss = criterion(F.log_softmax(y_preds, dim=1), y)
+            if config.GRADIENT_ACCUMULATION_STEPS > 1:
+                loss = loss / config.GRADIENT_ACCUMULATION_STEPS
+            losses.update(loss.item(), batch_size)
+            y_preds = softmax(y_preds)
+            print(losses.avg)
+            preds.append(y_preds.to('cpu').numpy())
+            end = time.time()
 
-    with torch.no_grad():  # Disable gradient computation
-        for batch_idx, (inputs, targets) in enumerate(val_loader):
-            inputs, targets = inputs.to(device), targets.to(device)
-
-            # Forward pass
-            outputs = model(inputs)
-            loss = criterion(outputs, targets)
-
-            total_loss += loss.item()
-
-            # Additional operations for metrics or logging can be added here
-
-    average_loss = total_loss / total_batches
-    return average_loss
+            # ========== LOG INFO ==========
+            if step % config.PRINT_FREQ == 0 or step == (len(val_loader)-1):
+                print('EVAL: [{0}/{1}] '
+                      'Elapsed {remain:s} '
+                      'Loss: {loss.avg:.4f} '
+                      .format(step, len(val_loader),
+                              remain=timeSince(start, float(step+1)/len(val_loader)),
+                              loss=losses))
+                
+    prediction_dict["predictions"] = np.concatenate(preds)
+    return losses.avg, prediction_dict
 
 
-def _log_epoch_results(epoch, avg_train_loss, avg_val_loss, fold, model, dataset_name):
+def _log_epoch_results(epoch, avg_train_loss, avg_val_loss, model, dataset_name):
     """
     Logs the results at the end of each epoch during training and validation.
 
@@ -284,18 +277,12 @@ def _log_epoch_results(epoch, avg_train_loss, avg_val_loss, fold, model, dataset
         avg_train_loss (float): The average training loss for the epoch.
         avg_val_loss (float): The average validation loss for the epoch.
         prediction_dict (dict): A dictionary containing predictions and other relevant information.
-        fold (int): The current fold number in a cross-validation setup.
         model (torch.nn.Module): The model being trained and validated.
         dataset_name (str): The name of the dataset used for training and validation.
 
     Returns:
         None
     """
-    logger = logging.getLogger(__name__)
-
-    logger.info(
-        f"Epoch {epoch+1} / Fold {fold} / Dataset {dataset_name} / Model {model.config.NAME}"
-    )
     logger.info(f"Average Training Loss: {avg_train_loss:.4f}")
     logger.info(f"Average Validation Loss: {avg_val_loss:.4f}")
 
@@ -321,7 +308,7 @@ def _collect_final_predictions(val_loader, model, device):
 
             # Forward pass to get outputs/predictions
             outputs = model(inputs)
-
+            outputs = torch.nn.functional.log_softmax(outputs + 1e-6, dim=1)
             # Convert outputs to probabilities and then to CPU for further processing if needed
             probabilities = torch.nn.functional.softmax(outputs, dim=1)
             predictions.extend(probabilities.cpu().numpy())
