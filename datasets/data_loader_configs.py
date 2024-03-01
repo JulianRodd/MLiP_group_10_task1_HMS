@@ -74,7 +74,7 @@ class BaseDataConfig:
 class BasePretraining(BaseDataConfig):
     BATCH_SIZE_TRAIN = 32
     FILTER_BY_ANNOTATOR = True
-    FILTER_BY_ANNOTATOR_MAX = 20
+    FILTER_BY_ANNOTATOR_MAX = 30
     FILTER_BY_ANNOTATOR_MIN = 4
     FILTER_BY_ANNOTATOR_ON_VAL = False
 
@@ -83,7 +83,7 @@ class BaseFinetuning(BaseDataConfig):
     BATCH_SIZE_TRAIN = 32
     FILTER_BY_ANNOTATOR = True
     FILTER_BY_ANNOTATOR_MAX = inf
-    FILTER_BY_ANNOTATOR_MIN = 20
+    FILTER_BY_ANNOTATOR_MIN = 30
     FILTER_BY_ANNOTATOR_ON_VAL = False
 
 
