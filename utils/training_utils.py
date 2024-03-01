@@ -251,7 +251,6 @@ def _valid_epoch(val_loader, model, criterion, device, writer, epoch=0):
                 loss = loss / config.GRADIENT_ACCUMULATION_STEPS
             losses.update(loss.item(), batch_size)
             y_preds = softmax(y_preds)
-            print(losses.avg)
             preds.append(y_preds.to('cpu').numpy())
             end = time.time()
 
@@ -283,8 +282,8 @@ def _log_epoch_results(epoch, avg_train_loss, avg_val_loss, model, dataset_name)
     Returns:
         None
     """
-    logger.info(f"Average Training Loss: {avg_train_loss:.4f}")
-    logger.info(f"Average Validation Loss: {avg_val_loss:.4f}")
+    logger.info(f"Training Loss: {avg_train_loss:.4f}")
+    logger.info(f"Validation Loss: {avg_val_loss:.4f}")
 
 
 def _collect_final_predictions(val_loader, model, device):

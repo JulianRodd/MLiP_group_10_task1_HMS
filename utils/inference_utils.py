@@ -24,7 +24,7 @@ def perform_inference(test_dataset: CustomDataset, model, model_dir: str, tensor
     """
     combined_writer = SummaryWriter(Paths.TENSORBOARD_INFERENCE, f"{tensorboard_prefix}/{model.config.NAME}_{test_dataset.config.NAME}_combined")
     combined_preds = []
-    model.load_state_dict(torch.load(model_dir))
+    model.load_state_dict(torch.load(model_dir, map_location=torch.device(Generics.DEVICE)))
     model.eval()  # Set the model to evaluation mode
     test_loader = test_dataset.get_torch_data_loader()
     softmax = nn.Softmax(dim=1)
@@ -87,9 +87,11 @@ def create_submission(test_df, predictions, target_columns, submission_file):
     # Reorder the columns to have 'eeg_id' first
     column_order = ['eeg_id'] + target_columns
     submission_df = submission_df[column_order]
-
+    submission_df = submission_df.astype({'eeg_id': int})
+    submission_df.head()
     # Save the submission file
     submission_df.to_csv(submission_file, index=False)
 
     print(f'Submission shape: {submission_df.shape}')
     return submission_df
+  
