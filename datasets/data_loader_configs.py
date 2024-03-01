@@ -68,6 +68,20 @@ class BaseDataConfig:
 
 
 
+class BasePretraining(BaseDataConfig):
+    FILTER_BY_ANNOTATOR = True
+    FILTER_BY_ANNOTATOR_MAX = 8
+    FILTER_BY_ANNOTATOR_MIN = 0
+    FILTER_BY_ANNOTATOR_ON_VAL = False
+
+
+class BaseFinetuning(BaseDataConfig):
+    FILTER_BY_ANNOTATOR = True
+    FILTER_BY_ANNOTATOR_MAX = 8
+    FILTER_BY_ANNOTATOR_MIN = 22
+    FILTER_BY_ANNOTATOR_ON_VAL = False
+
+
 class ExtremelySmallBaseConfig(BaseDataConfig):
     BATCH_SIZE_TRAIN = 2
     BATCH_SIZE_TEST = 1
