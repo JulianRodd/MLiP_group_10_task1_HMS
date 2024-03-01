@@ -51,9 +51,9 @@ def load_main_dfs(data_loader_config, train_val_split = (0.8, 0.2)) -> pd.DataFr
             val_df = filter_by_agreement(val_df, data_loader_config.FILTER_BY_AGREEMENT_MIN)
         
         if (data_loader_config.FILTER_BY_ANNOTATOR):
-          train_df = filter_by_annotators(train_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX)
+          train_df = filter_by_annotators(train_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX, n_annot=train_df['n_annot'])
           if (data_loader_config.FILTER_BY_ANNOTATOR_ON_VAL):
-            val_df = filter_by_annotators(val_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX)
+            val_df = filter_by_annotators(val_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX, n_annot=val_df['n_annot'])
         test_df = samples_test_csv_pd
 
         return train_df, val_df, test_df
@@ -82,6 +82,7 @@ def prepare_train_df(df: pd.DataFrame) -> pd.DataFrame:
         train_df[label] = aux[label].values
         
     y_data = train_df[Generics.LABEL_COLS].values
+    train_df['n_annot'] = y_data.sum(axis=1)
     y_data = y_data / y_data.sum(axis=1,keepdims=True)
     train_df[Generics.LABEL_COLS] = y_data
     
