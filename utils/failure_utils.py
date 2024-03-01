@@ -3,11 +3,12 @@ import itertools
 from sklearn.metrics import confusion_matrix
 import numpy as np 
 from utils.inference_utils import perform_inference
-from generics import Generics, Paths, KagglePaths 
+from generics import Generics, Paths
 from datasets.data_loader import CustomDataset
 from datasets.data_loader_configs import BaseDataConfig
 from models.CustomModel import CustomModel
 from models.custom_model_configs import BaseModelConfig
+from pandas import DataFrame
 
 
 def plot_confusion_matrix(cm, classes,
@@ -49,18 +50,25 @@ def plot_confusion_matrix(cm, classes,
 def majority_confusion(y_pred, y_true, labels): 
     '''
     Shows confusion matrix for majority class.
+    y_pred: np.ndarray(n_samples, 6)
+    y_true like y_pred
+    labels: col labels 
     '''
-    maj = np.argmax(y_true, axis=0)
-    maj_pred = np.argmax(y_pred, axis=0)
-    cnf_matrix = confusion_matrix(maj, maj_pred)
+    maj = np.argmax(y_true, axis=1)
+    print(maj)
+    maj = [labels[clss] for clss in maj]
+    maj_pred = np.argmax(y_pred, axis=1)
+    print(maj_pred)
+    maj_pred = [labels[clss] for clss in maj_pred]
+    cnf_matrix = confusion_matrix(maj, maj_pred, labels=labels)
 
-    plot_confusion_matrix(cnf_matrix, classes=labels,normalize= False,  title='Confusion matrix')
+    plot_confusion_matrix(cnf_matrix, classes=labels, normalize= False, title='Confusion matrix')
 
     return cnf_matrix
 
 
 
-def avg_mispred(y_pred:np.ndarray, y_true:np.ndarray, by_class=True):
+def avg_mispred(y_true:np.ndarray, y_pred:np.ndarray, by_class:bool):
     '''
     Returns average misclassification per label (per true majority class if by_class is True)
     '''
@@ -79,19 +87,22 @@ def avg_mispred(y_pred:np.ndarray, y_true:np.ndarray, by_class=True):
 def plot_avg_mispred(differences:np.ndarray, by_class=True): 
     x_ax = np.arange(0.5, len(Generics.LABEL_COLS)+0.5)
     if by_class: 
+        fig, axes = plt.subplots(1, len(Generics.LABEL_COLS))
+        axes = axes.flatten()
         for i, clss in enumerate(Generics.LABEL_COLS): 
-            plt.bar(x=x_ax, height=differences[i])
-            plt.xticks(ticks=x_ax, labels=Generics.LABEL_COLS)
-            plt.title(f'Avg misprediction per true majority class - {clss}')
-            plt.show()
+            axes[i].bar(x=x_ax, height=differences[i])
+            axes[i].set_xticks(ticks=x_ax, labels=Generics.LABEL_COLS, rotation=90)
+            axes[i].set_title(clss)
     else: 
-        plt.bar(x=np.arange(len(Generics.LABEL_COLS)), height=differences[i])
+        plt.bar(x=x_ax, height=differences)
         plt.title(f'Avg misprediction')
         plt.xticks(ticks=x_ax, labels=Generics.LABEL_COLS)
-        plt.show()
+    plt.suptitle('Avg misprediction per true majority class')
+    # plt.tight_layout()
+    plt.show()
 
 
-def failure_analysis(dataset:CustomDataset, model:CustomModel, model_dir:str): 
+def failure_analysis(dataset:CustomDataset, model:CustomModel=None, model_dir:str=None, submission_df:DataFrame=None): 
     """
     Perform inference on the val dataset using the trained model and log results to TensorBoard.
     Show confusion matrix for majority class and average difference to ground truth distribution. 
@@ -100,18 +111,21 @@ def failure_analysis(dataset:CustomDataset, model:CustomModel, model_dir:str):
         test_dataset (CustomDataset): The test dataset.
         model (torch.nn.Module): The base model on with which checkpoints were generated.
         model_dir (str): path to model checkpoint to test 
+        submission_df (pd.DataFrame): can be passed instead of model info; assumes it is coming from a non shuffled validation set so the order is the same 
 
     Returns: 
         confusion matrix of majority classes (np.ndarray)
         avg differences between true and predicted per class (np.ndarray)
         avg differences between true and predicted across classes (np.ndarray)
     """
-
-    y_pred = perform_inference(dataset, model, [model_dir])
-
     dataset.load_data()
     y_true = dataset.main_df[Generics.LABEL_COLS]
     
+    if submission_df is None: 
+        y_pred = perform_inference(dataset, model, [model_dir]).values()
+    else:
+        y_pred = submission_df.drop(columns=['eeg_id'])
+
     cnf_mtrx = majority_confusion(y_pred=y_pred, y_true=y_true, labels=Generics.LABEL_COLS)
 
     diff_classes = avg_mispred(y_pred=y_pred, y_true=y_true, by_class=True)
