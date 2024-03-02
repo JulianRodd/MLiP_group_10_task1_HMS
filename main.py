@@ -13,16 +13,19 @@ from utils.training_utils import train
 from generics import Generics
 
 def main():
-    class Config_Normalize_Group_Raw_ICA(BaseDataConfig):
+    class Config_Normalize_Group_Raw_ICA_50(BaseDataConfig):
         NORMALIZE_EEG_SPECTROGRAMS = True
         NORMALIZE_INDIVIDUALLY = False
         APPLY_ICA_RAW_EEG = True
         USE_PRELOADED_EEG_SPECTROGRAMS = False
         USE_PRELOADED_SPECTROGRAMS = False
         BATCH_SIZE_TEST = 1
-        FILTER_BY_AGREEMENT = True
+        FILTER_BY_AGREEMENT = False
         FILTER_BY_AGREEMENT_MIN = 50
+        BATCH_SIZE_TRAIN = 32
+        BATCH_SIZE_VAL = 32
         FILTER_BY_AGREEMENT_ON_VAL = False
+        SUBSET_SAMPLE_COUNT = 300
 
 
     class EfficientNetB0Config_Big_Weight_Decay(BaseModelConfig):
@@ -34,15 +37,16 @@ def main():
         MAX_LEARNING_RATE_SCHEDULERER = 0.001
         USE_KAGGLE_SPECTROGRAMS = True
 
-    data_loader_config = Config_Normalize_Group_Raw_ICA
+    data_loader_config = Config_Normalize_Group_Raw_ICA_50
     model_config = EfficientNetB0Config_Big_Weight_Decay
         
     train_df, val_df, test_df = load_main_dfs(data_loader_config, train_val_split=(0.8, 0.2))
 
     test_dataset = CustomDataset(config=data_loader_config,main_df = test_df, mode="test", cache=False)
-
+    val_dataset = CustomDataset(config=data_loader_config,main_df = val_df, mode="val", cache=False)
+    train_dataset = CustomDataset(config=data_loader_config,main_df = train_df, mode="train", cache=False)
     model = CustomModel(model_config, pretrained = False)
-
+    train(train_dataset=train_dataset, val_dataset=val_dataset, model=model,  tensorboard_prefix="50 samples") 
     modelDir = f"{Paths.BEST_MODEL_CHECKPOINTS}best_{model_config.MODEL}_{model_config.NAME}_{data_loader_config.NAME}.pth"
 
     preds = perform_inference(test_dataset, model, modelDir)

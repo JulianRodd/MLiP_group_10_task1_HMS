@@ -202,7 +202,7 @@ def _train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, de
                 optimizer.zero_grad()
                 scheduler.step()
             end = time.time()
-
+            writer.add_scalar("Loss/train", loss.item(), epoch * total_batches + step)
             # ========== LOG INFO ==========
             if step % config.PRINT_FREQ == 0 or step == (len(train_loader)-1):
                 print('Epoch: [{0}][{1}/{2}] '
@@ -253,7 +253,7 @@ def _valid_epoch(val_loader, model, criterion, device, writer, epoch=0):
             y_preds = softmax(y_preds)
             preds.append(y_preds.to('cpu').numpy())
             end = time.time()
-
+            writer.add_scalar("Loss/val", loss.item(), epoch * len(val_loader) + step)
             # ========== LOG INFO ==========
             if step % config.PRINT_FREQ == 0 or step == (len(val_loader)-1):
                 print('EVAL: [{0}/{1}] '
