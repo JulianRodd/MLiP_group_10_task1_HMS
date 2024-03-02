@@ -22,7 +22,7 @@ def apply_ica_to_eeg_spectrograms(eeg_spectrograms, n_components=4, max_iter=100
         reshaped_eeg_data = eeg_data.reshape(-1, eeg_data.shape[2])
 
         # Perform ICA
-        ica = FastICA(n_components=n_components, max_iter=max_iter, tol=tol)
+        ica = FastICA(n_components=n_components, whiten = 'unit-variance', max_iter=max_iter, tol=tol)
         try:
             S_ = ica.fit_transform(reshaped_eeg_data)  # Get independent components
 

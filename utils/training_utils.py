@@ -204,7 +204,7 @@ def _train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, de
                 optimizer.zero_grad()
                 scheduler.step()
             end = time.time()
-
+            writer.add_scalar("Loss/train", loss.item(), epoch * total_batches + step)
             # ========== LOG INFO ==========
             if step % config.PRINT_FREQ == 0 or step == (len(train_loader)-1):
                 print('Epoch: [{0}][{1}/{2}] '
@@ -253,10 +253,9 @@ def _valid_epoch(val_loader, model, criterion, device, writer, epoch=0):
                 loss = loss / config.GRADIENT_ACCUMULATION_STEPS
             losses.update(loss.item(), batch_size)
             y_preds = softmax(y_preds)
-            print(losses.avg)
             preds.append(y_preds.to('cpu').numpy())
             end = time.time()
-
+            writer.add_scalar("Loss/val", loss.item(), epoch * len(val_loader) + step)
             # ========== LOG INFO ==========
             if step % config.PRINT_FREQ == 0 or step == (len(val_loader)-1):
                 print('EVAL: [{0}/{1}] '
@@ -285,8 +284,8 @@ def _log_epoch_results(epoch, avg_train_loss, avg_val_loss, model, dataset_name)
     Returns:
         None
     """
-    logger.info(f"Average Training Loss: {avg_train_loss:.4f}")
-    logger.info(f"Average Validation Loss: {avg_val_loss:.4f}")
+    logger.info(f"Training Loss: {avg_train_loss:.4f}")
+    logger.info(f"Validation Loss: {avg_val_loss:.4f}")
 
 
 def _collect_final_predictions(val_loader, model, device):
