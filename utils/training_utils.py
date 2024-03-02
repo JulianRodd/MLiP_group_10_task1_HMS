@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import pandas as pd
 import time
+from scipy.special import kl_div
 from datasets.data_loader import CustomDataset
 from generics import Generics, Paths
 import torch.nn as nn
@@ -85,7 +86,8 @@ def train_loop(
                 model.device,
                 writer
             )
-            avg_val_loss, _ = _valid_epoch(val_loader, model, criterion, model.device, writer, epoch)
+            avg_val_loss, val_predictions = _valid_epoch(val_loader, model, criterion, model.device, writer, epoch)
+            # val_kl_div = np.sum(kl_div(y_true, y_pred) for y_true, y_pred in )
             _log_epoch_results(
                 epoch,
                 avg_train_loss,

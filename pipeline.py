@@ -14,6 +14,12 @@ num_subsamples = 10
 subsample_paths = "/home/janneke/Documents/Master/Machine_Learning_in_Practice/HMS/MLiP_group_10_task1_HMS/data/cache/raw_subsamples/*.csv"
 count = 0
 
+chris_preloaded = np.load(
+    "/home/janneke/Documents/Master/Machine_Learning_in_Practice/HMS/MLiP_group_10_task1_HMS/data/kaggle/input/brain-eeg-spectrograms/eeg_specs.npy",
+    allow_pickle=True
+    ).item()
+
+
 for subsample_file in glob(subsample_paths):
     count += 1
     if count > num_subsamples:
