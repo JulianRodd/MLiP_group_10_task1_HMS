@@ -87,6 +87,11 @@ class BaseFinetuning(BaseDataConfig):
     FILTER_BY_ANNOTATOR_ON_VAL = False
 
 
+class BaseLarge(BaseDataConfig):
+    BATCH_SIZE_TRAIN = 32
+    ONE_SAMPLE = False
+
+
 class ExtremelySmallBaseConfig(BaseDataConfig):
     BATCH_SIZE_TRAIN = 2
     BATCH_SIZE_TEST = 1

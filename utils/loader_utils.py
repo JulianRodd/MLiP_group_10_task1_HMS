@@ -35,8 +35,9 @@ def load_main_dfs(data_loader_config, train_val_split = (0.8, 0.2)) -> pd.DataFr
         test_csv_pd= test_csv_pd[~test_csv_pd["eeg_id"].isin(Generics.OPT_OUT_EEG_ID)]
         
         # Sample one record from each unique patient
-        sampled_train_csv_pd = prepared_train_df.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
-        samples_test_csv_pd = test_csv_pd.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
+        if data_loader_config.ONE_SAMPLE:
+            sampled_train_csv_pd = prepared_train_df.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
+            samples_test_csv_pd = test_csv_pd.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
       
         if train_sample_count == 0:
             train_sample_count = len(sampled_train_csv_pd)
