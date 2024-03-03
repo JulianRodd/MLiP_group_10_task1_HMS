@@ -45,7 +45,7 @@ def load_main_dfs(data_loader_config, train_val_split = (0.8, 0.2)) -> pd.DataFr
         if train_sample_count == 0:
             train_sample_count = len(sampled_train_csv_pd)
         
-        sampled_train_csv_pd = sampled_train_csv_pd.sample(n=train_sample_count, random_state=42)
+        sampled_train_csv_pd = sampled_train_csv_pd.sample(n=train_sample_count, random_state=42).reset_index(drop=True)
             
         gss = GroupShuffleSplit(n_splits=2, train_size=train_val_split[0], random_state=42)
         splits = gss.split(sampled_train_csv_pd, groups=sampled_train_csv_pd.patient_id)
