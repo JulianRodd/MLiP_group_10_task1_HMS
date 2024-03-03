@@ -32,6 +32,9 @@ class BaseDataConfig:
     APPLY_MSPCA_RAW_EEG = False
     APPLY_ICA_RAW_EEG = False
     APPLY_MSPCA_EEG_SPECTROGRAMS = False
+
+    # patient sampling 
+    ONE_SAMPLE = False
     
     #ANNOTATOR CONFIG
     FILTER_BY_AGREEMENT = False
