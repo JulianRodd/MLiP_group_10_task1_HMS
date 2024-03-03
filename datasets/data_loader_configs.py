@@ -66,7 +66,20 @@ class BaseDataConfig:
         if (getattr(cls, 'APPLY_MSPCA_RAW_EEG', False) or getattr(cls, 'APPLY_ICA_RAW_EEG', False)) and getattr(cls, 'USE_PRELOADED_EEG_SPECTROGRAMS', False):
             raise ValueError(f"{cls.NAME}: USE_PRELOADED_EEG_SPECTROGRAMS must be False when APPLY_MSPCA_RAW_EEG or APPLY_ICA_RAW_EEG is True.")
 
+class FullDataInferenceConfig(BaseDataConfig):
+    SUBSET_SAMPLE_COUNT = 0
+    BATCH_SIZE_TEST = 16
+    BATCH_SIZE_VAL = 16
+    BATCH_SIZE_TRAIN = 32
+    USE_PRELOADED_EEG_SPECTROGRAMS = False
+    USE_PRELOADED_SPECTROGRAMS = False
+    DROP_LAST = False
 
+class FullDataConfig(BaseDataConfig):
+    SUBSET_SAMPLE_COUNT = 0
+    BATCH_SIZE_TEST = 16
+    BATCH_SIZE_VAL = 16
+    BATCH_SIZE_TRAIN = 32
 
 class BasePretraining(BaseDataConfig):
     BATCH_SIZE_TRAIN = 32

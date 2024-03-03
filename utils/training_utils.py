@@ -13,6 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from utils.general_utils import AverageMeter, get_logger, timeSince
 from torch.optim.lr_scheduler import OneCycleLR
+from sklearn.metrics import mean_squared_error
 # Configure logger
 logger = get_logger(__name__)
 
@@ -87,7 +88,6 @@ def train_loop(
                 writer
             )
             avg_val_loss, val_predictions = _valid_epoch(val_loader, model, criterion, model.device, writer, epoch)
-            # val_kl_div = np.sum(kl_div(y_true, y_pred) for y_true, y_pred in )
             _log_epoch_results(
                 epoch,
                 avg_train_loss,
@@ -104,6 +104,7 @@ def train_loop(
                     model.state_dict(),
                     os.path.join(Paths.BEST_MODEL_CHECKPOINTS, best_model_name),
                 )
+                logger.info(f"Saved current model as best model (epoch {epoch})")
 
         # Collect and return final predictions
         for inputs, targets in val_loader:
@@ -182,6 +183,7 @@ def _train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, de
     start = end = time.time()
     scaler = torch.cuda.amp.GradScaler(enabled=config.AMP)
     losses = AverageMeter()
+    softmax = nn.Softmax(dim=1)
     i = 0
      # ========== ITERATE OVER TRAIN BATCHES ============
     with tqdm(train_loader, unit="train_batch", desc='Train') as tqdm_train_loader:
@@ -204,6 +206,9 @@ def _train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, de
                 optimizer.zero_grad()
                 scheduler.step()
             end = time.time()
+
+            mse = mean_squared_error(y.detach().cpu(), softmax(y_preds).detach().cpu())
+            writer.add_scalar("MSE/train", mse, epoch * total_batches + step)
             writer.add_scalar("Loss/train", loss.item(), epoch * total_batches + step)
             # ========== LOG INFO ==========
             if step % config.PRINT_FREQ == 0 or step == (len(train_loader)-1):
@@ -255,6 +260,8 @@ def _valid_epoch(val_loader, model, criterion, device, writer, epoch=0):
             y_preds = softmax(y_preds)
             preds.append(y_preds.to('cpu').numpy())
             end = time.time()
+            mse = mean_squared_error(y.detach().cpu(), softmax(y_preds).detach().cpu())
+            writer.add_scalar("MSE/val", mse,  epoch * len(val_loader) + step)
             writer.add_scalar("Loss/val", loss.item(), epoch * len(val_loader) + step)
             # ========== LOG INFO ==========
             if step % config.PRINT_FREQ == 0 or step == (len(val_loader)-1):

@@ -21,6 +21,14 @@ class BaseModelConfig:
         cls.NAME = cls.__name__
 
 
+class ShuffleNetBase(BaseModelConfig):
+    GRADIENT_ACCUMULATION_STEPS = 1
+    MODEL = 'shufflenet_v2_x1_0'
+    FREEZE = False
+    EPOCHS = 20
+    LEARNING_RATE = 0.01
+
+
 class ShuffleNetTest(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
     MODEL = 'shufflenet_v2_x1_0'
