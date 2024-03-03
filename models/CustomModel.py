@@ -14,6 +14,7 @@ class CustomModel(nn.Module):
         pretrained: bool = True,
         device=Generics.DEVICE,
         tensorboard_prefix: str = "all",
+        torch_model_cache_dir : str = 'pytorch/vision:v0.10.0'
     ):
         super(CustomModel, self).__init__()
         self.logger = get_logger(f"models/{__name__}")
@@ -27,7 +28,7 @@ class CustomModel(nn.Module):
             pretrained=pretrained,
             drop_rate=0.1,
             drop_path_rate=0.2,
-        ) if config.MODEL.startswith('tf_')  else torch.hub.load('pytorch/vision:v0.10.0', 
+        ) if config.MODEL.startswith('tf_')  else torch.hub.load(torch_model_cache_dir, 
                                                                  config.MODEL, pretrained=True)
         if config.FREEZE:
             for i, (name, param) in enumerate(

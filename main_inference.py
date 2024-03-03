@@ -1,5 +1,4 @@
 import pandas as pd
-import torch
 from datasets.data_loader import CustomDataset
 from datasets.data_loader_configs import FullDataInferenceConfig, FullDataConfig
 from generics import Paths, Generics
