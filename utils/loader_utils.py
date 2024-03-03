@@ -38,7 +38,10 @@ def load_main_dfs(data_loader_config, train_val_split = (0.8, 0.2)) -> pd.DataFr
         if data_loader_config.ONE_SAMPLE:
             sampled_train_csv_pd = prepared_train_df.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
             samples_test_csv_pd = test_csv_pd.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
-      
+        else: 
+            sampled_train_csv_pd = prepared_train_df
+            samples_test_csv_pd = test_csv_pd
+
         if train_sample_count == 0:
             train_sample_count = len(sampled_train_csv_pd)
         
