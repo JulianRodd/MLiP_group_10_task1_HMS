@@ -27,26 +27,25 @@ def generate_custom_spectrogram_from_eeg(eeg_data, feats, custom_config):
         ################################################################################################################
         
         validate_config(custom_config)
-        # "sfreq": 200,
-        # "l_freq": 1, 
-        # "h_freq": 70,
+
         ch_types = ["eeg"] * (len(eeg.columns) - 1)
         ch_types.append("ecg")
-        info = mne.create_info(ch_names=eeg.columns.tolist(), sfreq=custom_config["sfreq"], ch_types=ch_types)
-    
-        raw: mne.io.RawArray = mne.io.RawArray(eeg.values.T, info)
         
-        montage = mne.channels.make_standard_montage('standard_1020')
-        raw = raw.set_montage(montage)
-        updated_mont = raw.get_montage()
+        with mne.use_log_level("warning"):
+            info = mne.create_info(ch_names=eeg.columns.tolist(), sfreq=custom_config["sfreq"], ch_types=ch_types)
         
-        l_freq = custom_config.get("l_freq")
-        h_freq = custom_config.get("h_freq")
-        if l_freq is not None or h_freq is not None:
-            raw = raw.filter(l_freq=l_freq, h_freq=h_freq)
+            raw: mne.io.RawArray = mne.io.RawArray(eeg.values.T, info)
             
-        raw_np = raw.get_data()
-        eeg_np = np.transpose(raw_np)
+            montage = mne.channels.make_standard_montage('standard_1020')
+            raw = raw.set_montage(montage)
+            
+            l_freq = custom_config.get("l_freq")
+            h_freq = custom_config.get("h_freq")
+            if l_freq is not None or h_freq is not None:
+                raw = raw.filter(l_freq=l_freq, h_freq=h_freq)
+                
+            raw_np = raw.get_data()
+            eeg_np = np.transpose(raw_np)
         eeg = pd.DataFrame(eeg_np, columns=eeg.columns)
 
         ################################################################################################################
