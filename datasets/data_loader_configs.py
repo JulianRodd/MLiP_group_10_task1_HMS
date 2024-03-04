@@ -136,6 +136,7 @@ class BaseFinetuning(BaseDataConfig):
 class BaseLarge(BaseDataConfig):
     BATCH_SIZE_TRAIN = 32
     ONE_SAMPLE = False
+    SHUFFLE_TRAIN = False
 
 
 class ExtremelySmallBaseConfig(BaseDataConfig):

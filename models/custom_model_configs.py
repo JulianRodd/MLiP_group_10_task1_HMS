@@ -11,7 +11,7 @@ class BaseModelConfig:
     GRADIENT_ACCUMULATION_STEPS = 1
     T_MAX = 10
     NUM_FROZEN_LAYERS = 32
-    MAX_GRAD_NORM = 1000
+    MAX_GRAD_NORM = 1e7
     PRINT_FREQ = 10
     ETA_MIN = 0
     AMP = False
