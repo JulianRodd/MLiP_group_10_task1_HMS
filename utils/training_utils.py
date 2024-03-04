@@ -67,7 +67,7 @@ def train_loop(
             max_lr=model_config.MAX_LEARNING_RATE_SCHEDULERER,
             epochs=model_config.EPOCHS,
             steps_per_epoch=len(train_loader),
-            pct_start=0.05,
+            pct_start=0.1,
             anneal_strategy="cos",
             final_div_factor=100,
         )

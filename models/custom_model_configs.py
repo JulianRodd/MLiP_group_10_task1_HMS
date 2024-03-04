@@ -14,7 +14,7 @@ class BaseModelConfig:
     MAX_GRAD_NORM = 1e7
     PRINT_FREQ = 10
     ETA_MIN = 0
-    AMP = False
+    AMP = True
     # This method is called whenever a subclass of BaseModelConfig is created
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
