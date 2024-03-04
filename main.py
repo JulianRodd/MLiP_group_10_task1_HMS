@@ -43,10 +43,10 @@ def main():
     train_df, val_df, test_df = load_main_dfs(data_loader_config, train_val_split=(0.8, 0.2))
 
     test_dataset = CustomDataset(config=data_loader_config,main_df = test_df, mode="test", cache=False)
-    val_dataset = CustomDataset(config=data_loader_config,main_df = val_df, mode="val", cache=False)
-    train_dataset = CustomDataset(config=data_loader_config,main_df = train_df, mode="train", cache=False)
+    # val_dataset = CustomDataset(config=data_loader_config,main_df = val_df, mode="val", cache=False)
+    # train_dataset = CustomDataset(config=data_loader_config,main_df = train_df, mode="train", cache=False)
     model = CustomModel(model_config, pretrained = False)
-    train(train_dataset=train_dataset, val_dataset=val_dataset, model=model,  tensorboard_prefix="50 samples") 
+    # train(train_dataset=train_dataset, val_dataset=val_dataset, model=model,  tensorboard_prefix="50 samples") 
     modelDir = f"{Paths.BEST_MODEL_CHECKPOINTS}best_{model_config.MODEL}_{model_config.NAME}_{data_loader_config.NAME}.pth"
 
     preds = perform_inference(test_dataset, model, modelDir)

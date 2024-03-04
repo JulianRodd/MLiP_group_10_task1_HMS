@@ -79,9 +79,11 @@ def create_submission(test_df, predictions, target_columns, submission_file):
     """
     # Ensure the number of rows in predictions matches test_df
     assert len(test_df) == len(predictions), "Mismatch in number of predictions and number of test samples"
+    predictions = np.around(predictions, decimals=8, out=None)
+    predictions = np.float16(predictions)
     predictions = predictions / np.sum(predictions, axis=1)[:, np.newaxis]
-    if not np.allclose(np.sum(predictions, axis = 1), 1.0):
-        raise TypeError('Predictions must sum to one!')
+    if not np.allclose(np.sum(predictions, axis = 1), np.float(1.0), atol=1e-16, rtol=1e-16):
+        raise TypeError(f'Predictions must sum to one! Predictions: {predictions}')
 
     # Create a DataFrame for submission
     submission_df = pd.DataFrame(predictions, columns=target_columns)
