@@ -1,3 +1,6 @@
+from numpy import inf 
+
+
 class BaseDataConfig:
     NAME = "BaseDataConfig"
     # Common parameters across all configs
@@ -29,6 +32,9 @@ class BaseDataConfig:
     APPLY_MSPCA_RAW_EEG = False
     APPLY_ICA_RAW_EEG = False
     APPLY_MSPCA_EEG_SPECTROGRAMS = False
+
+    # patient sampling 
+    ONE_SAMPLE = False
     
     #ANNOTATOR CONFIG
     FILTER_BY_AGREEMENT = False
@@ -98,17 +104,22 @@ class FullDataCustomPreprocessingConfig(BaseDataConfig):
 class BasePretraining(BaseDataConfig):
     BATCH_SIZE_TRAIN = 32
     FILTER_BY_ANNOTATOR = True
-    FILTER_BY_ANNOTATOR_MAX = 8
-    FILTER_BY_ANNOTATOR_MIN = 0
+    FILTER_BY_ANNOTATOR_MAX = 30
+    FILTER_BY_ANNOTATOR_MIN = 4
     FILTER_BY_ANNOTATOR_ON_VAL = False
 
 
 class BaseFinetuning(BaseDataConfig):
     BATCH_SIZE_TRAIN = 32
     FILTER_BY_ANNOTATOR = True
-    FILTER_BY_ANNOTATOR_MAX = 8
-    FILTER_BY_ANNOTATOR_MIN = 22
+    FILTER_BY_ANNOTATOR_MAX = inf
+    FILTER_BY_ANNOTATOR_MIN = 30
     FILTER_BY_ANNOTATOR_ON_VAL = False
+
+
+class BaseLarge(BaseDataConfig):
+    BATCH_SIZE_TRAIN = 32
+    ONE_SAMPLE = False
 
 
 class ExtremelySmallBaseConfig(BaseDataConfig):

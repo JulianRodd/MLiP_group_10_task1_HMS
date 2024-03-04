@@ -2,7 +2,7 @@ import os
 from typing import Dict
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GroupShuffleSplit
 from tqdm import tqdm
 from glob import glob
 from utils.data_preprocessing_utils import filter_by_agreement, filter_by_annotators
@@ -35,15 +35,24 @@ def load_main_dfs(data_loader_config, train_val_split = (0.8, 0.2)) -> pd.DataFr
         test_csv_pd= test_csv_pd[~test_csv_pd["eeg_id"].isin(Generics.OPT_OUT_EEG_ID)]
         
         # Sample one record from each unique patient
-        sampled_train_csv_pd = prepared_train_df.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
-        samples_test_csv_pd = test_csv_pd.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
-      
+        if data_loader_config.ONE_SAMPLE:
+            sampled_train_csv_pd = prepared_train_df.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
+            samples_test_csv_pd = test_csv_pd.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
+        else: 
+            sampled_train_csv_pd = prepared_train_df
+            samples_test_csv_pd = test_csv_pd
+
         if train_sample_count == 0:
             train_sample_count = len(sampled_train_csv_pd)
         
-        sampled_train_csv_pd = sampled_train_csv_pd.sample(n=train_sample_count, random_state=42)
+        sampled_train_csv_pd = sampled_train_csv_pd.sample(n=train_sample_count, random_state=42).reset_index(drop=True)
             
-        train_df, val_df = train_test_split(sampled_train_csv_pd, test_size=train_val_split[1], random_state=42)
+        gss = GroupShuffleSplit(n_splits=2, train_size=train_val_split[0], random_state=42)
+        splits = gss.split(sampled_train_csv_pd, groups=sampled_train_csv_pd.patient_id)
+
+        train_id, val_id = next(splits)
+        train_df = sampled_train_csv_pd.loc[train_id]
+        val_df = sampled_train_csv_pd.loc[val_id]
         
         if (data_loader_config.FILTER_BY_AGREEMENT):
           train_df = filter_by_agreement(train_df, data_loader_config.FILTER_BY_AGREEMENT_MIN)
