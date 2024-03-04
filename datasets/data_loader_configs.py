@@ -1,3 +1,6 @@
+from numpy import inf 
+
+
 class BaseDataConfig:
     NAME = "BaseDataConfig"
     # Common parameters across all configs
@@ -29,6 +32,10 @@ class BaseDataConfig:
     APPLY_MSPCA_RAW_EEG = False
     APPLY_ICA_RAW_EEG = False
     APPLY_MSPCA_EEG_SPECTROGRAMS = False
+    PREPROCESSING = None
+
+    # patient sampling 
+    ONE_SAMPLE = False
     
     #ANNOTATOR CONFIG
     FILTER_BY_AGREEMENT = False
@@ -66,6 +73,69 @@ class BaseDataConfig:
         if (getattr(cls, 'APPLY_MSPCA_RAW_EEG', False) or getattr(cls, 'APPLY_ICA_RAW_EEG', False)) and getattr(cls, 'USE_PRELOADED_EEG_SPECTROGRAMS', False):
             raise ValueError(f"{cls.NAME}: USE_PRELOADED_EEG_SPECTROGRAMS must be False when APPLY_MSPCA_RAW_EEG or APPLY_ICA_RAW_EEG is True.")
 
+class FullDataInferenceConfig(BaseDataConfig):
+    SUBSET_SAMPLE_COUNT = 0
+    BATCH_SIZE_TEST = 16
+    BATCH_SIZE_VAL = 16
+    BATCH_SIZE_TRAIN = 32
+    USE_PRELOADED_EEG_SPECTROGRAMS = False
+    USE_PRELOADED_SPECTROGRAMS = False
+    DROP_LAST = False
+
+class FullDataConfig(BaseDataConfig):
+    SUBSET_SAMPLE_COUNT = 0
+    BATCH_SIZE_TEST = 16
+    BATCH_SIZE_VAL = 16
+    BATCH_SIZE_TRAIN = 32
+
+class FullDataCustomPreprocessingConfig(BaseDataConfig):
+    SUBSET_SAMPLE_COUNT = 0
+    BATCH_SIZE_TEST = 16
+    BATCH_SIZE_VAL = 16
+    BATCH_SIZE_TRAIN = 32
+    USE_PRELOADED_EEG_SPECTROGRAMS = False
+    USE_PRELOADED_SPECTROGRAMS = False
+    PREPROCESSING = {
+        "sfreq": 200,
+        "l_freq": 1, 
+        "h_freq": 70,
+        "save": False
+    }
+
+class FullDataCustomPreprocessingInferenceConfig(BaseDataConfig):
+    SUBSET_SAMPLE_COUNT = 0
+    BATCH_SIZE_TEST = 16
+    BATCH_SIZE_VAL = 16
+    BATCH_SIZE_TRAIN = 32
+    USE_PRELOADED_EEG_SPECTROGRAMS = False
+    USE_PRELOADED_SPECTROGRAMS = False
+    DROP_LAST = False
+    PREPROCESSING = {
+        "sfreq": 200,
+        "l_freq": 1, 
+        "h_freq": 70,
+        "save": False
+    }
+
+class BasePretraining(BaseDataConfig):
+    BATCH_SIZE_TRAIN = 32
+    FILTER_BY_ANNOTATOR = True
+    FILTER_BY_ANNOTATOR_MAX = 30
+    FILTER_BY_ANNOTATOR_MIN = 4
+    FILTER_BY_ANNOTATOR_ON_VAL = False
+
+
+class BaseFinetuning(BaseDataConfig):
+    BATCH_SIZE_TRAIN = 32
+    FILTER_BY_ANNOTATOR = True
+    FILTER_BY_ANNOTATOR_MAX = inf
+    FILTER_BY_ANNOTATOR_MIN = 30
+    FILTER_BY_ANNOTATOR_ON_VAL = False
+
+
+class BaseLarge(BaseDataConfig):
+    BATCH_SIZE_TRAIN = 32
+    ONE_SAMPLE = False
 
 
 class ExtremelySmallBaseConfig(BaseDataConfig):

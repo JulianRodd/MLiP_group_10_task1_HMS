@@ -2,14 +2,14 @@ import os
 from typing import Dict
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GroupShuffleSplit
 from tqdm import tqdm
 from glob import glob
 from utils.data_preprocessing_utils import filter_by_agreement, filter_by_annotators
 from utils.eeg_processing_utils import generate_eeg_from_parquet, generate_spectrogram_from_eeg
 from generics import Generics, Paths
 from utils.general_utils import get_logger
-
+from utils.custom_eeg_processing_utils import generate_custom_spectrogram_from_eeg
 
 import pandas as pd
 import numpy as np
@@ -35,15 +35,24 @@ def load_main_dfs(data_loader_config, train_val_split = (0.8, 0.2)) -> pd.DataFr
         test_csv_pd= test_csv_pd[~test_csv_pd["eeg_id"].isin(Generics.OPT_OUT_EEG_ID)]
         
         # Sample one record from each unique patient
-        sampled_train_csv_pd = prepared_train_df.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
-        samples_test_csv_pd = test_csv_pd.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
-      
+        if data_loader_config.ONE_SAMPLE:
+            sampled_train_csv_pd = prepared_train_df.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
+            samples_test_csv_pd = test_csv_pd.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
+        else: 
+            sampled_train_csv_pd = prepared_train_df
+            samples_test_csv_pd = test_csv_pd
+
         if train_sample_count == 0:
             train_sample_count = len(sampled_train_csv_pd)
         
-        sampled_train_csv_pd = sampled_train_csv_pd.sample(n=train_sample_count, random_state=42)
+        sampled_train_csv_pd = sampled_train_csv_pd.sample(n=train_sample_count, random_state=42).reset_index(drop=True)
             
-        train_df, val_df = train_test_split(sampled_train_csv_pd, test_size=train_val_split[1], random_state=42)
+        gss = GroupShuffleSplit(n_splits=2, train_size=train_val_split[0], random_state=42)
+        splits = gss.split(sampled_train_csv_pd, groups=sampled_train_csv_pd.patient_id)
+
+        train_id, val_id = next(splits)
+        train_df = sampled_train_csv_pd.loc[train_id]
+        val_df = sampled_train_csv_pd.loc[val_id]
         
         if (data_loader_config.FILTER_BY_AGREEMENT):
           train_df = filter_by_agreement(train_df, data_loader_config.FILTER_BY_AGREEMENT_MIN)
@@ -51,9 +60,9 @@ def load_main_dfs(data_loader_config, train_val_split = (0.8, 0.2)) -> pd.DataFr
             val_df = filter_by_agreement(val_df, data_loader_config.FILTER_BY_AGREEMENT_MIN)
         
         if (data_loader_config.FILTER_BY_ANNOTATOR):
-          train_df = filter_by_annotators(train_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX)
+          train_df = filter_by_annotators(train_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX, n_annot=train_df['n_annot'])
           if (data_loader_config.FILTER_BY_ANNOTATOR_ON_VAL):
-            val_df = filter_by_annotators(val_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX)
+            val_df = filter_by_annotators(val_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX, n_annot=val_df['n_annot'])
         test_df = samples_test_csv_pd
 
         return train_df, val_df, test_df
@@ -82,6 +91,7 @@ def prepare_train_df(df: pd.DataFrame) -> pd.DataFrame:
         train_df[label] = aux[label].values
         
     y_data = train_df[Generics.LABEL_COLS].values
+    train_df['n_annot'] = y_data.sum(axis=1)
     y_data = y_data / y_data.sum(axis=1,keepdims=True)
     train_df[Generics.LABEL_COLS] = y_data
     
@@ -125,7 +135,7 @@ def load_eeg_data(main_df: pd.DataFrame, mode: str) -> Dict[int, pd.DataFrame]:
         logger.error(f"Error loading EEG data: {e}")
         raise
 
-def process_eeg_data(eeg_data: pd.DataFrame, feats: list, use_wavelet: bool, mspca_on_raw_eeg: bool, ica_on_raw_eeg: bool) -> np.ndarray:
+def process_eeg_data(eeg_data: pd.DataFrame, feats: list, use_wavelet: bool, mspca_on_raw_eeg: bool, ica_on_raw_eeg: bool, custom_config=None) -> np.ndarray:
     """
     Process EEG data to generate a spectrogram, and apply MSPCA or ICA if required.
 
@@ -145,12 +155,15 @@ def process_eeg_data(eeg_data: pd.DataFrame, feats: list, use_wavelet: bool, msp
         eeg_data = apply_ica_raw_eeg(eeg_data, n_components=4)
         
     # Generate EEG spectrogram
-    eeg_spectrogram = generate_spectrogram_from_eeg(eeg_data, feats, use_wavelet)
+    if custom_config is not None:
+        eeg_spectrogram = generate_custom_spectrogram_from_eeg(eeg_data, feats, custom_config)
+    else:
+        eeg_spectrogram = generate_spectrogram_from_eeg(eeg_data, feats, use_wavelet)
 
     return eeg_spectrogram
 
 
-def load_eeg_spectrograms(main_df: pd.DataFrame, mode: str, feats, use_wavelet, mspca_on_raw_eeg: bool, ica_on_raw_eeg: bool) -> Dict[int, np.ndarray]:
+def load_eeg_spectrograms(main_df: pd.DataFrame, mode: str, feats, use_wavelet, mspca_on_raw_eeg: bool, ica_on_raw_eeg: bool, custom_config=None) -> Dict[int, np.ndarray]:
     """
     Load EEG spectrograms for the EEG IDs present in the provided DataFrame.
 
@@ -174,17 +187,26 @@ def load_eeg_spectrograms(main_df: pd.DataFrame, mode: str, feats, use_wavelet, 
         eeg_spectrograms = {}
         for eeg_id, eeg_data in tqdm(eeg_data_dict.items(), desc="Processing EEG Data"):
             eeg_id = int(eeg_id)
-            eeg_spectrogram = process_eeg_data(eeg_data, feats, use_wavelet, mspca_on_raw_eeg, ica_on_raw_eeg)
+            eeg_spectrogram = process_eeg_data(eeg_data, feats, use_wavelet, mspca_on_raw_eeg, ica_on_raw_eeg, custom_config)
             eeg_spectrograms[eeg_id] = eeg_spectrogram
 
+        if custom_config is not None:
+            if custom_config.get("save", False):
+                custom_config.pop("save")
+                config_str = "_".join([f"{key}-{value}" for key, value in sorted(custom_config.items())])
+                np.save(f"{Paths.PRE_LOADED_CUSTOM_EEGS_DIR}eeg_specs_custom_{config_str}.npy", eeg_spectrograms, allow_pickle=True)
         return eeg_spectrograms
 
     except Exception as e:
         logger.error(f"Error loading EEG spectrograms: {e}, {e.args}")
         raise
 
-def load_preloaded_eeg_spectrograms(main_df: pd.DataFrame):
-    pre_loaded_eegs = np.load(Paths.PRE_LOADED_EEGS, allow_pickle=True).item()
+def load_preloaded_eeg_spectrograms(main_df: pd.DataFrame, custom_config=None):
+    if custom_config is not None:
+        config_str = "_".join([f"{key}-{value}" for key, value in sorted(custom_config.items())])
+        pre_loaded_eegs = np.load(f"{Paths.PRE_LOADED_CUSTOM_EEGS_DIR}eeg_specs_custom_{config_str}.npy", allow_pickle=True).item()
+    else:
+        pre_loaded_eegs = np.load(Paths.PRE_LOADED_EEGS, allow_pickle=True).item()
     # select only where in main_df
     return {k: v for k, v in pre_loaded_eegs.items() if k in main_df["eeg_id"].values}
 

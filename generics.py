@@ -3,6 +3,7 @@ import torch
 
 class Paths:
     PRE_LOADED_EEGS = "./data/kaggle/input/brain-eeg-spectrograms/eeg_specs.npy"
+    PRE_LOADED_CUSTOM_EEGS_DIR = "./data/cache/"
     PRE_LOADED_SPECTROGRAMS = "./data/kaggle/input/brain-spectrograms/specs.npy"
     TRAIN_CSV = (
         "./data/kaggle/input/hms-harmful-brain-activity-classification/train.csv"
