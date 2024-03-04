@@ -27,7 +27,7 @@ def main(submission_file='submission.csv'):
     # Print summaries
     test_dataset.print_summary()
 
-    model = CustomModel(model_config)
+    model = CustomModel(model_config, torch_model_cache_dir='/home/janneke/Documents/torch/hub', pretrained=False)
     model_dir = f"{Paths.BEST_MODEL_CHECKPOINTS}best_{model_config.MODEL}_{model_config.NAME}_{data_loader_config_train.NAME}.pth"
 
     y_pred_probabilities = perform_inference(test_dataset, model, model_dir)

@@ -28,8 +28,8 @@ class CustomModel(nn.Module):
             pretrained=pretrained,
             drop_rate=0.1,
             drop_path_rate=0.2,
-        ) if config.MODEL.startswith('tf_')  else torch.hub.load(torch_model_cache_dir, 
-                                                                 config.MODEL, pretrained=True)
+        ) if config.MODEL.startswith('tf_')  else torch.hub.load(torch_model_cache_dir,
+                                                                 config.MODEL, pretrained=pretrained, source='github' if torch_model_cache_dir == 'pytorch/vision:v0.10.0' else 'local',)
         if config.FREEZE:
             for i, (name, param) in enumerate(
                 list(self.model.named_parameters())[0 : config.NUM_FROZEN_LAYERS]

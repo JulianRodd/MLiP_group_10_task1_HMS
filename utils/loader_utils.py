@@ -9,7 +9,7 @@ from utils.data_preprocessing_utils import filter_by_agreement, filter_by_annota
 from utils.eeg_processing_utils import generate_eeg_from_parquet, generate_spectrogram_from_eeg
 from generics import Generics, Paths
 from utils.general_utils import get_logger
-
+from utils.custom_eeg_processing_utils import generate_custom_spectrogram_from_eeg
 
 import pandas as pd
 import numpy as np
@@ -126,7 +126,7 @@ def load_eeg_data(main_df: pd.DataFrame, mode: str) -> Dict[int, pd.DataFrame]:
         logger.error(f"Error loading EEG data: {e}")
         raise
 
-def process_eeg_data(eeg_data: pd.DataFrame, feats: list, use_wavelet: bool, mspca_on_raw_eeg: bool, ica_on_raw_eeg: bool) -> np.ndarray:
+def process_eeg_data(eeg_data: pd.DataFrame, feats: list, use_wavelet: bool, mspca_on_raw_eeg: bool, ica_on_raw_eeg: bool, custom_config=None) -> np.ndarray:
     """
     Process EEG data to generate a spectrogram, and apply MSPCA or ICA if required.
 
@@ -146,12 +146,15 @@ def process_eeg_data(eeg_data: pd.DataFrame, feats: list, use_wavelet: bool, msp
         eeg_data = apply_ica_raw_eeg(eeg_data, n_components=4)
         
     # Generate EEG spectrogram
-    eeg_spectrogram = generate_spectrogram_from_eeg(eeg_data, feats, use_wavelet)
+    if custom_config is not None:
+        eeg_spectrogram = generate_custom_spectrogram_from_eeg(eeg_data, feats, custom_config)
+    else:
+        eeg_spectrogram = generate_spectrogram_from_eeg(eeg_data, feats, use_wavelet)
 
     return eeg_spectrogram
 
 
-def load_eeg_spectrograms(main_df: pd.DataFrame, mode: str, feats, use_wavelet, mspca_on_raw_eeg: bool, ica_on_raw_eeg: bool) -> Dict[int, np.ndarray]:
+def load_eeg_spectrograms(main_df: pd.DataFrame, mode: str, feats, use_wavelet, mspca_on_raw_eeg: bool, ica_on_raw_eeg: bool, custom_config=None) -> Dict[int, np.ndarray]:
     """
     Load EEG spectrograms for the EEG IDs present in the provided DataFrame.
 
@@ -175,17 +178,26 @@ def load_eeg_spectrograms(main_df: pd.DataFrame, mode: str, feats, use_wavelet, 
         eeg_spectrograms = {}
         for eeg_id, eeg_data in tqdm(eeg_data_dict.items(), desc="Processing EEG Data"):
             eeg_id = int(eeg_id)
-            eeg_spectrogram = process_eeg_data(eeg_data, feats, use_wavelet, mspca_on_raw_eeg, ica_on_raw_eeg)
+            eeg_spectrogram = process_eeg_data(eeg_data, feats, use_wavelet, mspca_on_raw_eeg, ica_on_raw_eeg, custom_config)
             eeg_spectrograms[eeg_id] = eeg_spectrogram
 
+        if custom_config is not None:
+            if custom_config.get("save", False):
+                custom_config.pop("save")
+                config_str = "_".join([f"{key}-{value}" for key, value in sorted(custom_config.items())])
+                np.save(f"{Paths.PRE_LOADED_CUSTOM_EEGS_DIR}eeg_specs_custom_{config_str}.npy", eeg_spectrograms, allow_pickle=True)
         return eeg_spectrograms
 
     except Exception as e:
         logger.error(f"Error loading EEG spectrograms: {e}, {e.args}")
         raise
 
-def load_preloaded_eeg_spectrograms(main_df: pd.DataFrame):
-    pre_loaded_eegs = np.load(Paths.PRE_LOADED_EEGS, allow_pickle=True).item()
+def load_preloaded_eeg_spectrograms(main_df: pd.DataFrame, custom_config=None):
+    if custom_config is not None:
+        config_str = "_".join([f"{key}-{value}" for key, value in sorted(custom_config.items())])
+        pre_loaded_eegs = np.load(f"{Paths.PRE_LOADED_CUSTOM_EEGS_DIR}eeg_specs_custom_{config_str}.npy", allow_pickle=True).item()
+    else:
+        pre_loaded_eegs = np.load(Paths.PRE_LOADED_EEGS, allow_pickle=True).item()
     # select only where in main_df
     return {k: v for k, v in pre_loaded_eegs.items() if k in main_df["eeg_id"].values}
 
