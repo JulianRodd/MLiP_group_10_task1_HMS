@@ -77,7 +77,7 @@ class CustomDataset(Dataset):
             if self.config.USE_PRELOADED_EEG_SPECTROGRAMS:
                 self.eeg_spectrograms = load_preloaded_eeg_spectrograms(self.main_df, custom_config=self.config.PREPROCESSING)
             else:
-                self.eeg_spectrograms = load_eeg_spectrograms(main_df=self.main_df, mode=self.mode, feats = self.config.FEATS, use_wavelet=self.config.USE_WAVELET, mspca_on_raw_eeg=self.config.APPLY_MSPCA_RAW_EEG, ica_on_raw_eeg=self.config.APPLY_ICA_RAW_EEG, custom_config=custom_preprocessing_config)
+                self.eeg_spectrograms = load_eeg_spectrograms(main_df=self.main_df, mode=self.mode, feats = self.config.FEATS, use_wavelet=self.config.USE_WAVELET, mspca_on_raw_eeg=self.config.APPLY_MSPCA_RAW_EEG, ica_on_raw_eeg=self.config.APPLY_ICA_RAW_EEG, custom_config=self.config.PREPROCESSING)
             
             if self.config.NORMALIZE_EEG_SPECTROGRAMS:
                 self.eeg_spectrograms = normalize_eeg_spectrograms(self.eeg_spectrograms, self.config.NORMALIZE_INDIVIDUALLY)
