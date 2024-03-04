@@ -37,7 +37,7 @@ class CustomDataset(Dataset):
         self,
         config,
         main_df: pd.DataFrame,
-        augment: bool = True,
+        augment: bool = False,
         mode: str = "train",
         cache: bool = True,
         tensorboard_prefix: str = "all",
