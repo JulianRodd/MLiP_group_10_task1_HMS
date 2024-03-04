@@ -81,6 +81,20 @@ class FullDataConfig(BaseDataConfig):
     BATCH_SIZE_VAL = 16
     BATCH_SIZE_TRAIN = 32
 
+class FullDataCustomPreprocessingConfig(BaseDataConfig):
+    SUBSET_SAMPLE_COUNT = 0
+    BATCH_SIZE_TEST = 16
+    BATCH_SIZE_VAL = 16
+    BATCH_SIZE_TRAIN = 32
+    USE_PRELOADED_EEG_SPECTROGRAMS = False
+    USE_PRELOADED_SPECTROGRAMS = False
+    PREPROCESSING = {
+        "sfreq": 200,
+        "l_freq": 1, 
+        "h_freq": 70,
+        "save": False
+    }
+
 class BasePretraining(BaseDataConfig):
     BATCH_SIZE_TRAIN = 32
     FILTER_BY_ANNOTATOR = True
