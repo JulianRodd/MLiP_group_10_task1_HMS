@@ -46,24 +46,28 @@ def load_main_dfs(data_loader_config, train_val_split = (0.8, 0.2)) -> pd.DataFr
             train_sample_count = len(sampled_train_csv_pd)
         
         sampled_train_csv_pd = sampled_train_csv_pd.sample(n=train_sample_count, random_state=42).reset_index(drop=True)
-            
-        gss = GroupShuffleSplit(n_splits=2, train_size=train_val_split[0], random_state=42)
-        splits = gss.split(sampled_train_csv_pd, groups=sampled_train_csv_pd.patient_id)
+        
+        train_df = sampled_train_csv_pd
+        val_df = None
+        test_df = None
+        if False:
+            gss = GroupShuffleSplit(n_splits=2, train_size=train_val_split[0], random_state=42)
+            splits = gss.split(sampled_train_csv_pd, groups=sampled_train_csv_pd.patient_id)
 
-        train_id, val_id = next(splits)
-        train_df = sampled_train_csv_pd.loc[train_id]
-        val_df = sampled_train_csv_pd.loc[val_id]
+            train_id, val_id = next(splits)
+            train_df = sampled_train_csv_pd.loc[train_id]
+            val_df = sampled_train_csv_pd.loc[val_id]
         
-        if (data_loader_config.FILTER_BY_AGREEMENT):
-          train_df = filter_by_agreement(train_df, data_loader_config.FILTER_BY_AGREEMENT_MIN)
-          if (data_loader_config.FILTER_BY_AGREEMENT_ON_VAL):
-            val_df = filter_by_agreement(val_df, data_loader_config.FILTER_BY_AGREEMENT_MIN)
-        
-        if (data_loader_config.FILTER_BY_ANNOTATOR):
-          train_df = filter_by_annotators(train_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX, n_annot=train_df['n_annot'])
-          if (data_loader_config.FILTER_BY_ANNOTATOR_ON_VAL):
-            val_df = filter_by_annotators(val_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX, n_annot=val_df['n_annot'])
-        test_df = samples_test_csv_pd
+            if (data_loader_config.FILTER_BY_AGREEMENT):
+                train_df = filter_by_agreement(train_df, data_loader_config.FILTER_BY_AGREEMENT_MIN)
+            if (data_loader_config.FILTER_BY_AGREEMENT_ON_VAL):
+                val_df = filter_by_agreement(val_df, data_loader_config.FILTER_BY_AGREEMENT_MIN)
+            
+            if (data_loader_config.FILTER_BY_ANNOTATOR):
+                train_df = filter_by_annotators(train_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX, n_annot=train_df['n_annot'])
+            if (data_loader_config.FILTER_BY_ANNOTATOR_ON_VAL):
+                val_df = filter_by_annotators(val_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX, n_annot=val_df['n_annot'])
+            test_df = samples_test_csv_pd
 
         return train_df, val_df, test_df
 

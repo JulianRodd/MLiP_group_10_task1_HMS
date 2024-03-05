@@ -79,6 +79,7 @@ def train_loop(
             logger.info(f"Epoch {epoch + 1}/{total_epochs}")
             avg_train_loss = _train_epoch(
                 train_loader,
+                val_loader,
                 model,
                 criterion,
                 optimizer,
@@ -87,14 +88,14 @@ def train_loop(
                 model.device,
                 writer
             )
-            avg_val_loss, val_predictions = _valid_epoch(val_loader, model, criterion, model.device, writer, epoch)
-            _log_epoch_results(
-                epoch,
-                avg_train_loss,
-                avg_val_loss,
-                model,
-                train_dataset.config.NAME,
-            )
+            # avg_val_loss, val_predictions = _valid_epoch(val_loader, model, criterion, model.device, writer, epoch)
+            # _log_epoch_results(
+            #     epoch,
+            #     avg_train_loss,
+            #     avg_val_loss,
+            #     model,
+            #     train_dataset.config.NAME,
+            # )
 
             # Save the best model with fold information
             if avg_val_loss < best_loss:
@@ -160,7 +161,7 @@ def _configure_optimizer(model, config):
 
 
 
-def _train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, device, writer):
+def _train_epoch(train_loader, val_loader, model, criterion, optimizer, epoch, scheduler, device, writer):
     """
     Handles the training of the model for one epoch.
 
@@ -222,7 +223,17 @@ def _train_epoch(train_loader, model, criterion, optimizer, epoch, scheduler, de
                               loss=losses,
                               grad_norm=grad_norm,
                               lr=scheduler.get_last_lr()[0]))
-
+            if step % 40 == 0:
+                _valid_epoch(val_loader, model, criterion, device, writer, epoch) 
+                avg_val_loss, val_predictions, mse_avg = _valid_epoch(val_loader, model, criterion, model.device, writer, epoch)
+                writer.add_scalar("MSE/val", mse_avg,  epoch * len(val_loader) + step)
+                writer.add_scalar("Loss/val", avg_val_loss, epoch * len(val_loader) + step)
+                # _log_epoch_results(
+                #     epoch,
+                #     avg_val_loss,
+                #     model,
+                #     train_dataset.config.NAME,
+                # )
     return losses.avg
 
 
@@ -246,6 +257,7 @@ def _valid_epoch(val_loader, model, criterion, device, writer, epoch=0):
     prediction_dict = {}
     preds = []
     start = end = time.time()
+    avg_mse = []
     with tqdm(val_loader, unit="valid_batch", desc='Validation') as tqdm_valid_loader:
         for step, (X, y) in enumerate(tqdm_valid_loader):
             X = X.to(device)
@@ -261,8 +273,7 @@ def _valid_epoch(val_loader, model, criterion, device, writer, epoch=0):
             preds.append(y_preds.to('cpu').numpy())
             end = time.time()
             mse = mean_squared_error(y.detach().cpu(), softmax(y_preds).detach().cpu())
-            writer.add_scalar("MSE/val", mse,  epoch * len(val_loader) + step)
-            writer.add_scalar("Loss/val", loss.item(), epoch * len(val_loader) + step)
+            avg_mse.append(mse)
             # ========== LOG INFO ==========
             if step % config.PRINT_FREQ == 0 or step == (len(val_loader)-1):
                 print('EVAL: [{0}/{1}] '
@@ -273,7 +284,7 @@ def _valid_epoch(val_loader, model, criterion, device, writer, epoch=0):
                               loss=losses))
                 
     prediction_dict["predictions"] = np.concatenate(preds)
-    return losses.avg, prediction_dict
+    return losses.avg, prediction_dict, np.sum(avg_mse)/len(avg_mse)
 
 
 def _log_epoch_results(epoch, avg_train_loss, avg_val_loss, model, dataset_name):
