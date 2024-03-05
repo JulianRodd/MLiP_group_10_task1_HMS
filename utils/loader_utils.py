@@ -29,9 +29,8 @@ def load_main_dfs(data_loader_config, train_val_split = (0.8, 0.2)) -> pd.DataFr
         logger = get_logger("main_df_loader.log")
         train_csv_pd = pd.read_csv(Paths.TRAIN_CSV)
         prepared_train_df = prepare_train_df(train_csv_pd)
-        
         test_csv_pd = pd.read_csv(Paths.TEST_CSV)
-        prepared_train_df= prepared_train_df[~prepared_train_df["eeg_id"].isin(Generics.OPT_OUT_EEG_ID)]
+        prepared_train_df = prepared_train_df[~prepared_train_df["eeg_id"].isin(Generics.OPT_OUT_EEG_ID)]
         test_csv_pd= test_csv_pd[~test_csv_pd["eeg_id"].isin(Generics.OPT_OUT_EEG_ID)]
         
         # Sample one record from each unique patient
@@ -41,16 +40,18 @@ def load_main_dfs(data_loader_config, train_val_split = (0.8, 0.2)) -> pd.DataFr
         else: 
             sampled_train_csv_pd = prepared_train_df
             samples_test_csv_pd = test_csv_pd
+        ### CHECKED ###
 
         if train_sample_count == 0:
             train_sample_count = len(sampled_train_csv_pd)
         
         sampled_train_csv_pd = sampled_train_csv_pd.sample(n=train_sample_count, random_state=42).reset_index(drop=True)
             
-        gss = GroupShuffleSplit(n_splits=2, train_size=train_val_split[0], random_state=42)
+        gss = GroupShuffleSplit(n_splits=2, train_size=train_val_split[0], random_state=42)  ### CHECKING somehow we make two splits here with a train and val group per split, but it does not seem to matter
         splits = gss.split(sampled_train_csv_pd, groups=sampled_train_csv_pd.patient_id)
 
         train_id, val_id = next(splits)
+        ### CHECKED ### train and val ids sum up to 17089 and do not contain duplicates (len(set((*train_id, *val_id))) == 17089)
         train_df = sampled_train_csv_pd.loc[train_id]
         val_df = sampled_train_csv_pd.loc[val_id]
         
@@ -65,6 +66,9 @@ def load_main_dfs(data_loader_config, train_val_split = (0.8, 0.2)) -> pd.DataFr
             val_df = filter_by_annotators(val_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX, n_annot=val_df['n_annot'])
         test_df = samples_test_csv_pd
 
+        # train_df len: 13702 
+        # val_df len: 3387 
+        # test_df len: 1 
         return train_df, val_df, test_df
 
     except Exception as e:
@@ -242,6 +246,7 @@ def load_preloaded_spectrograms(main_df: pd.DataFrame):
     pre_loaded_spectrograms = np.load(Paths.PRE_LOADED_SPECTROGRAMS, allow_pickle=True).item()
     # select only where in main_df
     return {k: v for k, v in pre_loaded_spectrograms.items() if k in main_df["spectrogram_id"].values}
+
 def load_spectrograms(main_df: pd.DataFrame, mode: str) -> Dict[int, np.ndarray]:
     """
     Load spectrogram data for the spectrogram IDs present in the provided DataFrame.
