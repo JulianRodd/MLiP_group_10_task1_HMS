@@ -1,6 +1,6 @@
 
 from datasets.data_loader import CustomDataset
-from datasets.data_loader_configs import FullDataCustomPreprocessingConfig
+from datasets.data_loader_configs import BaseLarge
 from generics import Paths
 from models.CustomModel import CustomModel
 from models.custom_model_configs import ShuffleNetBase
@@ -58,7 +58,7 @@ from utils.training_utils import train
 def main():
     logger = get_logger("main")
     
-    data_loader_config = FullDataCustomPreprocessingConfig
+    data_loader_config = BaseLarge
 
     model_config = ShuffleNetBase
     

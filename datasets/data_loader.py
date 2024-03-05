@@ -74,25 +74,25 @@ class CustomDataset(Dataset):
             self.load_from_cache(cache_file)
         else:
             self.logger.info("Processing and caching new dataset")
-            if self.config.USE_PRELOADED_EEG_SPECTROGRAMS:
+            if True:
                 self.eeg_spectrograms = load_preloaded_eeg_spectrograms(self.main_df, custom_config=self.config.PREPROCESSING)
             else:
                 self.eeg_spectrograms = load_eeg_spectrograms(main_df=self.main_df, mode=self.mode, feats = self.config.FEATS, use_wavelet=self.config.USE_WAVELET, mspca_on_raw_eeg=self.config.APPLY_MSPCA_RAW_EEG, ica_on_raw_eeg=self.config.APPLY_ICA_RAW_EEG, custom_config=self.config.PREPROCESSING)
             
-            if self.config.NORMALIZE_EEG_SPECTROGRAMS:
+            if False:
                 self.eeg_spectrograms = normalize_eeg_spectrograms(self.eeg_spectrograms, self.config.NORMALIZE_INDIVIDUALLY)
           
-            if self.config.APPLY_ICA_EEG_SPECTROGRAMS:
+            if False:
                 self.eeg_spectrograms = apply_ica_to_eeg_spectrograms(self.eeg_spectrograms)
                 if self.config.NORMALIZE_EEG_SPECTROGRAMS:
                     self.eeg_spectrograms = normalize_eeg_spectrograms(self.eeg_spectrograms, self.config.NORMALIZE_INDIVIDUALLY)
             
-            if self.config.APPLY_MSPCA_EEG_SPECTROGRAMS:
+            if False:
                 self.eeg_spectrograms = apply_mspca_to_eeg_spectrograms(self.eeg_spectrograms, n_components=self.config.N_COMPONENTS)
                 if self.config.NORMALIZE_EEG_SPECTROGRAMS:
                     self.eeg_spectrograms = normalize_eeg_spectrograms(self.eeg_spectrograms)
           
-            if self.config.USE_PRELOADED_SPECTROGRAMS:
+            if True:
                 self.spectrograms = load_preloaded_spectrograms(self.main_df)
             else:
                 self.spectrograms = load_spectrograms(main_df=self.main_df, mode=self.mode)
@@ -242,12 +242,14 @@ class CustomDataset(Dataset):
 
                 X[14:-14, :, region] = img[:, 22:-22] / 2.0
 
+                # Append additional EEG data if available
+                if row.eeg_id in self.eeg_spectrograms:
+                    X[:, :, 4:] = self.eeg_spectrograms[row.eeg_id]
+
             if self.mode != "test":
                 y = row[self.label_cols].values.astype(np.float32)
 
-            # Append additional EEG data if available
-            if row.eeg_id in self.eeg_spectrograms:
-                X[:, :, 4:] = self.eeg_spectrograms[row.eeg_id]
+
 
             return X, y
 
