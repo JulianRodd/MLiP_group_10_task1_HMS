@@ -137,7 +137,7 @@ class BaseLarge(BaseDataConfig):
     BATCH_SIZE_TRAIN = 32
     ONE_SAMPLE = False
     SHUFFLE_TRAIN = False
-    SUBSET_SAMPLE_COUNT = 1000
+    SUBSET_SAMPLE_COUNT = 0
 
 
 class ExtremelySmallBaseConfig(BaseDataConfig):

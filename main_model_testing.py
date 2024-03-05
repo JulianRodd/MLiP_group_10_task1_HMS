@@ -76,7 +76,7 @@ def main():
 
     # Initialize and train the model
     model = CustomModel(model_config)
-    train(model=model, train_dataset=train_dataset, val_dataset=val_dataset, tensorboard_prefix="shufflenet_test_wd")
+    train(model=model, train_dataset=train_dataset, val_dataset=val_dataset, tensorboard_prefix="BUG_HUNT_SHUFFLENET")
     
     modelDir = f"{Paths.BEST_MODEL_CHECKPOINTS}/best_{model_config.MODEL}_{model_config.NAME}_{data_loader_config.NAME}.pth"
 

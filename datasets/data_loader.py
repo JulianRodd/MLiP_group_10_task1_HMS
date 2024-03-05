@@ -243,11 +243,11 @@ class CustomDataset(Dataset):
                 X[14:-14, :, region] = img[:, 22:-22] / 2.0
 
                 # Append additional EEG data if available
-                if row.eeg_id in self.eeg_spectrograms:
-                    X[:, :, 4:] = self.eeg_spectrograms[row.eeg_id]
+                # if row.eeg_id in self.eeg_spectrograms:
+                X[:, :, 4:] = self.eeg_spectrograms[row.eeg_id]
 
-            if self.mode != "test":
-                y = row[self.label_cols].values.astype(np.float32)
+                if self.mode != "test":
+                    y = row[self.label_cols].values.astype(np.float32)
 
 
 
