@@ -76,7 +76,7 @@ class CustomDataset(Dataset):
             self.logger.info("Processing and caching new dataset")
             if self.config.USE_PRELOADED_EEG_SPECTROGRAMS:
                 self.eeg_spectrograms = load_preloaded_eeg_spectrograms(self.main_df, custom_config=self.config.PREPROCESSING)
-            else:
+            else: ### CHECKED ### load_eeg_spectrograms loads the correct number of eeg spectrograms
                 self.eeg_spectrograms = load_eeg_spectrograms(main_df=self.main_df, mode=self.mode, feats = self.config.FEATS, use_wavelet=self.config.USE_WAVELET, mspca_on_raw_eeg=self.config.APPLY_MSPCA_RAW_EEG, ica_on_raw_eeg=self.config.APPLY_ICA_RAW_EEG, custom_config=self.config.PREPROCESSING)
             
             if self.config.NORMALIZE_EEG_SPECTROGRAMS:
@@ -93,7 +93,7 @@ class CustomDataset(Dataset):
                     self.eeg_spectrograms = normalize_eeg_spectrograms(self.eeg_spectrograms)
           
             if self.config.USE_PRELOADED_SPECTROGRAMS:
-                self.spectrograms = load_preloaded_spectrograms(self.main_df)
+                self.spectrograms = load_preloaded_spectrograms(self.main_df)   ### CHECKED ### There are only 8978 spectrograms loaded. Is that okay?
             else:
                 self.spectrograms = load_spectrograms(main_df=self.main_df, mode=self.mode)
                 

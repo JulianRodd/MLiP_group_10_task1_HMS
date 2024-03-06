@@ -32,7 +32,8 @@ class Paths:
 
 
 class Generics:
-    OPT_OUT_EEG_ID = [1457334423]
+    OPT_OUT_EEG_ID = []
+    # OPT_OUT_EEG_ID = [1457334423]
     LABEL_COLS = [
         "seizure_vote",
         "lpd_vote",

@@ -29,6 +29,15 @@ class ShuffleNetBase(BaseModelConfig):
     LEARNING_RATE = 0.01
 
 
+class ShuffleNetBase_Large(BaseModelConfig):
+    GRADIENT_ACCUMULATION_STEPS = 1
+    MODEL = 'shufflenet_v2_x1_0'
+    FREEZE = False
+    EPOCHS = 20
+    LEARNING_RATE = 0.01
+    LARGE_CLASSIFIER = True
+
+
 class ShuffleNetTest(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
     MODEL = 'shufflenet_v2_x1_0'

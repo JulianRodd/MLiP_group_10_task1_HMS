@@ -60,7 +60,10 @@ def generate_spectrogram_from_eeg(eeg_data, feats, use_wavelet: bool, display: b
             for kk in range(4):
                 x = eeg[COLS[kk]].values - eeg[COLS[kk + 1]].values
                 m = np.nanmean(x)
-                x = np.nan_to_num(x, nan=m)
+                ### CHEKCED AND CHANGED: WE DID NR 1, CHRIS DOES NR 2 ###
+                # x = np.nan_to_num(x, nan=m)   # NR 1
+                if np.isnan(x).mean()<1: x = np.nan_to_num(x,nan=m)
+                else: x[:] = 0   # NR 2
 
                 if use_wavelet:
                     x = denoise(
@@ -79,6 +82,7 @@ def generate_spectrogram_from_eeg(eeg_data, feats, use_wavelet: bool, display: b
                     fmax=20,
                     win_length=128,
                 )
+                
                 width = (mel_spec.shape[1] // 32) * 32
                 mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max).astype(
                     np.float32

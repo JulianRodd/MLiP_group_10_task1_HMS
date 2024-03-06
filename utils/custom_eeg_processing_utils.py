@@ -1,11 +1,6 @@
 import mne
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt 
-from glob import glob
-from generics import Generics
-from mne.viz.utils import _compute_scalings
-from mne._fiff.pick import channel_indices_by_type
 import librosa
 
 
@@ -43,6 +38,11 @@ def generate_custom_spectrogram_from_eeg(eeg_data, feats, custom_config):
             h_freq = custom_config.get("h_freq")
             if l_freq is not None or h_freq is not None:
                 raw = raw.filter(l_freq=l_freq, h_freq=h_freq)
+                
+            notch_filter = custom_config.get("notch_filter")
+            if notch_filter is not None:
+                raw.notch_filter(notch_filter)
+                
                 
             raw_np = raw.get_data()
             eeg_np = np.transpose(raw_np)
