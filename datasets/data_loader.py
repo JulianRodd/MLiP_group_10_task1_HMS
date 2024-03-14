@@ -7,14 +7,18 @@ import pandas as pd
 from torch.utils.data import Dataset
 import torch
 import albumentations as A
-from utils.data_preprocessing_utils import create_non_overlapping_eeg_crops
 from generics import Paths, Generics
 from prettytable import PrettyTable
 from utils.general_utils import get_logger
-from utils.loader_utils import load_eeg_spectrograms, load_spectrograms, load_preloaded_eeg_spectrograms, load_preloaded_spectrograms, normalize_eeg_spectrograms
+from utils.loader_utils import (
+    load_eeg_spectrograms,
+    load_spectrograms,
+    load_preloaded_eeg_spectrograms,
+    load_preloaded_spectrograms,
+    normalize_eeg_spectrograms,
+)
 from utils.visualisation_utils import plot_eeg_combined_graph, plot_spectrogram
 from torch.utils.data import DataLoader, Dataset
-from sklearn.model_selection import train_test_split
 from utils.ica_utils import apply_ica_to_eeg_spectrograms
 from utils.mspca_utils import apply_mspca_to_eeg_spectrograms
 
@@ -28,9 +32,8 @@ class CustomDataset(Dataset):
         augment (bool): Flag to determine if augmentation should be applied.
         mode (str): Operating mode ('train' or 'test').
         spectrograms (dict): Dictionary to hold EEG spectrograms.
-        eeg_spectrograms (dict): Dictionary to hold processed EEG spectrograms.
-        main_df (pd.DataFrame): Main dataframe holding the dataset information.
-        label_cols (List[str]): List of label column names in the dataframe.
+        cache (bool): Flag to determine if the dataset should be cached.
+        tensorboard_prefix (str): Prefix for the TensorBoard logs.
     """
 
     def __init__(
@@ -42,25 +45,20 @@ class CustomDataset(Dataset):
         cache: bool = True,
         tensorboard_prefix: str = "all",
     ):
-        """
-        Initialize the dataset.
-
-        Args:
-            config (DataConfig): Configuration for the dataset.
-            subset_sample_count (int): Number of samples to subset. Default is 0 (all samples).
-            augment (bool): Whether to apply augmentation. Default is False.
-            mode (str): Operating mode ('train' or 'test'). Default is 'train'.
-        """
         self.logger = get_logger("data_loader.log")
         self.config = config
         self.main_df = main_df
         self.label_cols = Generics.LABEL_COLS
-        self.writer = SummaryWriter(log_dir=os.path.join(Paths.TENSORBOARD_DATASETS, f'{tensorboard_prefix}/{config.NAME}_{mode}'))
+        self.writer = SummaryWriter(
+            log_dir=os.path.join(
+                Paths.TENSORBOARD_DATASETS, f"{tensorboard_prefix}/{config.NAME}_{mode}"
+            )
+        )
         self.augment = augment
         self.mode = mode
         self.spectrograms = {}
         self.eeg_spectrograms = {}
-        
+
         if mode == "test":
             self.batch_size = config.BATCH_SIZE_TEST
         elif mode == "val":
@@ -74,33 +72,57 @@ class CustomDataset(Dataset):
             self.load_from_cache(cache_file)
         else:
             self.logger.info("Processing and caching new dataset")
-            if True:
-                self.eeg_spectrograms = load_preloaded_eeg_spectrograms(self.main_df, custom_config=self.config.PREPROCESSING)
-            else: ### CHECKED ### load_eeg_spectrograms loads the correct number of eeg spectrograms
-                self.eeg_spectrograms = load_eeg_spectrograms(main_df=self.main_df, mode=self.mode, feats = self.config.FEATS, use_wavelet=self.config.USE_WAVELET, mspca_on_raw_eeg=self.config.APPLY_MSPCA_RAW_EEG, ica_on_raw_eeg=self.config.APPLY_ICA_RAW_EEG, custom_config=self.config.PREPROCESSING)
-            
-            if False:
-                self.eeg_spectrograms = normalize_eeg_spectrograms(self.eeg_spectrograms, self.config.NORMALIZE_INDIVIDUALLY)
-          
-            if False:
-                self.eeg_spectrograms = apply_ica_to_eeg_spectrograms(self.eeg_spectrograms)
-                if self.config.NORMALIZE_EEG_SPECTROGRAMS:
-                    self.eeg_spectrograms = normalize_eeg_spectrograms(self.eeg_spectrograms, self.config.NORMALIZE_INDIVIDUALLY)
-            
-            if False:
-                self.eeg_spectrograms = apply_mspca_to_eeg_spectrograms(self.eeg_spectrograms, n_components=self.config.N_COMPONENTS)
-                if self.config.NORMALIZE_EEG_SPECTROGRAMS:
-                    self.eeg_spectrograms = normalize_eeg_spectrograms(self.eeg_spectrograms)
-          
-            if self.config.USE_PRELOADED_SPECTROGRAMS:
-                self.spectrograms = load_preloaded_spectrograms(self.main_df)   ### CHECKED ### There are only 8978 spectrograms loaded. Is that okay?
+            if self.config.USE_PRELOADED_EEG_SPECTROGRAMS:
+                self.eeg_spectrograms = load_preloaded_eeg_spectrograms(
+                    self.main_df, custom_config=self.config.PREPROCESSING
+                )
             else:
-                self.spectrograms = load_spectrograms(main_df=self.main_df, mode=self.mode)
-                
+                self.eeg_spectrograms = load_eeg_spectrograms(
+                    main_df=self.main_df,
+                    mode=self.mode,
+                    feats=self.config.FEATS,
+                    use_wavelet=self.config.USE_WAVELET,
+                    mspca_on_raw_eeg=self.config.APPLY_MSPCA_RAW_EEG,
+                    ica_on_raw_eeg=self.config.APPLY_ICA_RAW_EEG,
+                    custom_config=self.config.PREPROCESSING,
+                )
+
+            if self.config.NORMALIZE_EEG_SPECTROGRAMS:
+                self.eeg_spectrograms = normalize_eeg_spectrograms(
+                    self.eeg_spectrograms, self.config.NORMALIZE_INDIVIDUALLY
+                )
+
+            if self.config.APPLY_ICA_EEG_SPECTROGRAMS:
+                self.eeg_spectrograms = apply_ica_to_eeg_spectrograms(
+                    self.eeg_spectrograms
+                )
+                if self.config.NORMALIZE_EEG_SPECTROGRAMS:
+                    self.eeg_spectrograms = normalize_eeg_spectrograms(
+                        self.eeg_spectrograms, self.config.NORMALIZE_INDIVIDUALLY
+                    )
+
+            if self.config.APPLY_MSPCA_EEG_SPECTROGRAMS:
+                self.eeg_spectrograms = apply_mspca_to_eeg_spectrograms(
+                    self.eeg_spectrograms, n_components=self.config.N_COMPONENTS
+                )
+                if self.config.NORMALIZE_EEG_SPECTROGRAMS:
+                    self.eeg_spectrograms = normalize_eeg_spectrograms(
+                        self.eeg_spectrograms
+                    )
+
+            if self.config.USE_PRELOADED_SPECTROGRAMS:
+                self.spectrograms = load_preloaded_spectrograms(self.main_df)
+            else:
+                self.spectrograms = load_spectrograms(
+                    main_df=self.main_df, mode=self.mode
+                )
+
             if cache:
-              self.cache_data(cache_file)
-        
-        self.logger.info(f"Dataset loaded: {self.mode} mode, {len(self.main_df)} samples, with config {self.config.NAME}")
+                self.cache_data(cache_file)
+
+        self.logger.info(
+            f"Dataset loaded: {self.mode} mode, {len(self.main_df)} samples, with config {self.config.NAME}"
+        )
 
     def generate_cache_filename(self, subset_sample_count: int, mode: str) -> str:
         """
@@ -123,10 +145,12 @@ class CustomDataset(Dataset):
         Args:
             cache_file (str): The file path where the dataset will be cached.
         """
-        np.savez(f"{Paths.CACHE_PATH_WRITE}{cache_file}", 
-                 main_df=self.main_df.to_records(index=False),
-                 spectrograms=self.spectrograms,
-                 eeg_spectrograms=self.eeg_spectrograms)
+        np.savez(
+            f"{Paths.CACHE_PATH_WRITE}{cache_file}",
+            main_df=self.main_df.to_records(index=False),
+            spectrograms=self.spectrograms,
+            eeg_spectrograms=self.eeg_spectrograms,
+        )
         self.logger.info(f"Dataset cached at {cache_file}")
 
     def load_from_cache(self, cache_file: str):
@@ -137,10 +161,10 @@ class CustomDataset(Dataset):
             cache_file (str): The file path from which the dataset will be loaded.
         """
         cached_data = np.load(f"{Paths.CACHE_PATH_READ}{cache_file}", allow_pickle=True)
-        self.spectrograms = cached_data['spectrograms'].item()
-        self.eeg_spectrograms = cached_data['eeg_spectrograms'].item()
+        self.spectrograms = cached_data["spectrograms"].item()
+        self.eeg_spectrograms = cached_data["eeg_spectrograms"].item()
         self.label_cols = Generics.LABEL_COLS
-    
+
     def get_torch_data_loader(self):
         """
         Get the torch data loader for the dataset.
@@ -163,8 +187,6 @@ class CustomDataset(Dataset):
         except Exception as e:
             self.logger.error(f"Error getting data loader: {e}")
             raise
-      
-            
 
     def __len__(self) -> int:
         """
@@ -221,11 +243,10 @@ class CustomDataset(Dataset):
             y = np.zeros(6, dtype="float32")
             row = self.main_df.iloc[index]
 
-            if 'min' in row and 'max' in row:
+            if "min" in row and "max" in row:
                 r = int((row["min"] + row["max"]) // 4)
             else:
-                r = 0 
-
+                r = 0
 
             for region in range(4):
                 img = self.spectrograms[row.spectrogram_id][
@@ -242,14 +263,10 @@ class CustomDataset(Dataset):
 
                 X[14:-14, :, region] = img[:, 22:-22] / 2.0
 
-                # Append additional EEG data if available
-                # if row.eeg_id in self.eeg_spectrograms:
                 X[:, :, 4:] = self.eeg_spectrograms[row.eeg_id]
 
                 if self.mode != "test":
                     y = row[self.label_cols].values.astype(np.float32)
-
-
 
             return X, y
 
@@ -272,8 +289,7 @@ class CustomDataset(Dataset):
         """
         transform = A.Compose([A.HorizontalFlip(p=0.5)])
         return transform(image=img)["image"]
-  
-  
+
     def print_summary(self):
         """
         Prints and logs a summary of the dataset including dataset size, mode, data distribution,
@@ -281,9 +297,9 @@ class CustomDataset(Dataset):
         """
         try:
             total_samples = len(self.main_df)
-            unique_patients = self.main_df['patient_id'].nunique()
-            unique_eegs = self.main_df['eeg_id'].nunique()
-            unique_spectrograms = self.main_df['spectrogram_id'].nunique()
+            unique_patients = self.main_df["patient_id"].nunique()
+            unique_eegs = self.main_df["eeg_id"].nunique()
+            unique_spectrograms = self.main_df["spectrogram_id"].nunique()
 
             summary_str = f"Dataset Summary:\n"
             summary_str += f"Mode: {self.mode}\n"
@@ -295,7 +311,7 @@ class CustomDataset(Dataset):
             self.writer.add_text("Dataset/Summary", summary_str, 0)
 
             if self.mode == "train":
-                augmentation_status = 'Enabled' if self.augment else 'Disabled'
+                augmentation_status = "Enabled" if self.augment else "Disabled"
                 summary_str += f"Augmentation: {augmentation_status}\n"
 
                 label_distribution = self.main_df[self.label_cols].sum()
@@ -303,14 +319,29 @@ class CustomDataset(Dataset):
 
                 # Convert pandas Series to numpy array before logging to TensorBoard
                 label_distribution_np = label_distribution.values
-                self.writer.add_histogram("Dataset/Label_Distribution", label_distribution_np, 0)
+                self.writer.add_histogram(
+                    "Dataset/Label_Distribution", label_distribution_np, 0
+                )
 
-
-                vote_cols = ['seizure_vote', 'lpd_vote', 'gpd_vote', 'lrda_vote', 'grda_vote', 'other_vote']
-                vote_stats = self.main_df[vote_cols].agg(['mean', 'var'])
+                vote_cols = [
+                    "seizure_vote",
+                    "lpd_vote",
+                    "gpd_vote",
+                    "lrda_vote",
+                    "grda_vote",
+                    "other_vote",
+                ]
+                vote_stats = self.main_df[vote_cols].agg(["mean", "var"])
                 summary_str += f"\nVote Statistics:\n{vote_stats}\n"
                 for col in vote_cols:
-                    self.writer.add_scalars(f"Dataset/Vote_Stats/{col}", {"mean": vote_stats.loc["mean", col], "var": vote_stats.loc["var", col]}, 0)
+                    self.writer.add_scalars(
+                        f"Dataset/Vote_Stats/{col}",
+                        {
+                            "mean": vote_stats.loc["mean", col],
+                            "var": vote_stats.loc["var", col],
+                        },
+                        0,
+                    )
 
             summary_str += f"Spectrograms Loaded: {len(self.spectrograms)}\n"
             summary_str += f"EEG Spectrograms Loaded: {len(self.eeg_spectrograms)}\n"
@@ -320,7 +351,9 @@ class CustomDataset(Dataset):
             config_table.field_names = ["Configuration", "Value"]
             config_table.align = "l"
             for attr in dir(self.config):
-                if not attr.startswith("__") and not callable(getattr(self.config, attr)):
+                if not attr.startswith("__") and not callable(
+                    getattr(self.config, attr)
+                ):
                     value = getattr(self.config, attr)
                     config_table.add_row([attr, value])
                     self.writer.add_text(f"Configuration/{attr}", str(value), 0)
@@ -329,12 +362,13 @@ class CustomDataset(Dataset):
             summary_str += config_table.get_string()
 
             print(summary_str)
-            self.writer.add_text("Dataset/Configuration_Summary", config_table.get_html_string(), 0)
+            self.writer.add_text(
+                "Dataset/Configuration_Summary", config_table.get_html_string(), 0
+            )
 
         except Exception as e:
             self.logger.error(f"Error printing and logging dataset summary: {e}")
             raise
-
 
     def plot_samples(self, n_samples: int = 2):
         """
@@ -342,12 +376,16 @@ class CustomDataset(Dataset):
         """
         try:
             # Plot 2 samples from eegs
-            eeg_sample_ids = random.sample(list(self.eeg_spectrograms.keys()), n_samples)
+            eeg_sample_ids = random.sample(
+                list(self.eeg_spectrograms.keys()), n_samples
+            )
             for eeg_id in eeg_sample_ids:
                 plot_eeg_combined_graph(self.eeg_spectrograms[eeg_id])
 
             # Plot 2 samples from spectrogram_eegs
-            spectrogram_sample_ids = random.sample(list(self.spectrograms.keys()), n_samples)
+            spectrogram_sample_ids = random.sample(
+                list(self.spectrograms.keys()), n_samples
+            )
             for spectrogram_id in spectrogram_sample_ids:
                 plot_spectrogram(self.spectrograms[spectrogram_id])
 

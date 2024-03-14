@@ -34,10 +34,10 @@ class BaseDataConfig:
     APPLY_MSPCA_EEG_SPECTROGRAMS = False
     PREPROCESSING = None
 
-    # patient sampling
+    # Patient sampling
     ONE_SAMPLE = False
 
-    # ANNOTATOR CONFIG
+    # Annotator and agreement filtering
     FILTER_BY_AGREEMENT = False
     FILTER_BY_AGREEMENT_MIN = 50
     FILTER_BY_AGREEMENT_ON_VAL = False

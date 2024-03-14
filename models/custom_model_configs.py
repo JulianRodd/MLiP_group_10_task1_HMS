@@ -15,6 +15,7 @@ class BaseModelConfig:
     PRINT_FREQ = 10
     ETA_MIN = 0
     AMP = True
+
     # This method is called whenever a subclass of BaseModelConfig is created
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -23,14 +24,14 @@ class BaseModelConfig:
 
 class EffNetControl(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
-    MODEL = 'tf_efficientnet_b0'
+    MODEL = "tf_efficientnet_b0"
     FREEZE = False
     EPOCHS = 4
-    LARGE_CLASSIFIER = False 
+    LARGE_CLASSIFIER = False
     WEIGHT_DECAY = 0.01
-    AMP = True 
+    AMP = True
     MAX_GRAD_NORM = 1e7
-    
+
 
 class ShuffleNetBase(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
