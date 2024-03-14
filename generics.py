@@ -1,6 +1,7 @@
 import torch
 
 
+# This file contains all the generic variables and paths used throughout the project
 class Paths:
     PRE_LOADED_EEGS = "./data/kaggle/input/brain-eeg-spectrograms/eeg_specs.npy"
     PRE_LOADED_CUSTOM_EEGS_DIR = "./data/cache/"
@@ -31,6 +32,7 @@ class Paths:
     LOG_PATH = "./logs/"
 
 
+# This class contains all the generic variables used throughout the project
 class Generics:
     OPT_OUT_EEG_ID = []
     LABEL_COLS = [
