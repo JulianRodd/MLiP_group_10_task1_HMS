@@ -11,8 +11,9 @@
 
    <h4 align="center">HMS - Harmful Brain Activity</h4>
 
- 
-Classify seizures and other patterns of harmful brain activity in critically ill patients
+ <p>
+Classify seizures and other patterns of harmful brain activity in critically ill patients.
+</p>
   <a href="https://www.kaggle.com/competitions/hms-harmful-brain-activity-classification">
     <img src="images/thumbnail.jpg" alt="Logo" width="60" height="60">
   </a>
