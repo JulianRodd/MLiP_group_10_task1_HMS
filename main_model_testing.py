@@ -1,9 +1,9 @@
 
 from datasets.data_loader import CustomDataset
-from datasets.data_loader_configs import BaseDataConfig
+from datasets.data_loader_configs import BaseLarge
 from generics import Paths
 from models.CustomModel import CustomModel
-from models.custom_model_configs import ShuffleNetBase
+from models.custom_model_configs import EffNetControl
 from utils.general_utils import get_logger
 from utils.inference_utils import perform_inference
 from utils.loader_utils import load_main_dfs
@@ -60,9 +60,9 @@ class FullDataConfig(BaseDataConfig):
 def main():
     logger = get_logger("main")
     
-    data_loader_config = FullDataConfig
+    data_loader_config = BaseLarge
 
-    model_config = ShuffleNetBase
+    model_config = EffNetControl
     
     logger.info(f"Training model {model_config.NAME} with data loader {data_loader_config.NAME}")
     
@@ -78,7 +78,7 @@ def main():
 
     # Initialize and train the model
     model = CustomModel(model_config)
-    train(model=model, train_dataset=train_dataset, val_dataset=val_dataset, tensorboard_prefix="shufflenet_test_wd")
+    train(model=model, train_dataset=train_dataset, val_dataset=val_dataset, tensorboard_prefix="BUG_HUNT_EFFNET_GOOD_VAL")
     
     modelDir = f"{Paths.BEST_MODEL_CHECKPOINTS}/best_{model_config.MODEL}_{model_config.NAME}_{data_loader_config.NAME}.pth"
 

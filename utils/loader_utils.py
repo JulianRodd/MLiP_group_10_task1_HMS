@@ -51,24 +51,19 @@ def load_main_dfs(data_loader_config, train_val_split = (0.8, 0.2)) -> pd.DataFr
         splits = gss.split(sampled_train_csv_pd, groups=sampled_train_csv_pd.patient_id)
 
         train_id, val_id = next(splits)
-        ### CHECKED ### train and val ids sum up to 17089 and do not contain duplicates (len(set((*train_id, *val_id))) == 17089)
         train_df = sampled_train_csv_pd.loc[train_id]
         val_df = sampled_train_csv_pd.loc[val_id]
         
         if (data_loader_config.FILTER_BY_AGREEMENT):
-          train_df = filter_by_agreement(train_df, data_loader_config.FILTER_BY_AGREEMENT_MIN)
-          if (data_loader_config.FILTER_BY_AGREEMENT_ON_VAL):
+            train_df = filter_by_agreement(train_df, data_loader_config.FILTER_BY_AGREEMENT_MIN)
+        if (data_loader_config.FILTER_BY_AGREEMENT_ON_VAL):
             val_df = filter_by_agreement(val_df, data_loader_config.FILTER_BY_AGREEMENT_MIN)
         
         if (data_loader_config.FILTER_BY_ANNOTATOR):
-          train_df = filter_by_annotators(train_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX, n_annot=train_df['n_annot'])
-          if (data_loader_config.FILTER_BY_ANNOTATOR_ON_VAL):
+            train_df = filter_by_annotators(train_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX, n_annot=train_df['n_annot'])
+        if (data_loader_config.FILTER_BY_ANNOTATOR_ON_VAL):
             val_df = filter_by_annotators(val_df, data_loader_config.FILTER_BY_ANNOTATOR_MIN, data_loader_config.FILTER_BY_ANNOTATOR_MAX, n_annot=val_df['n_annot'])
         test_df = samples_test_csv_pd
-
-        # train_df len: 13702 
-        # val_df len: 3387 
-        # test_df len: 1 
         return train_df, val_df, test_df
 
     except Exception as e:

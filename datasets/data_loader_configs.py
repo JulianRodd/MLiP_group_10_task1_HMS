@@ -28,7 +28,7 @@ class BaseDataConfig:
     APPLY_ICA_EEG_SPECTROGRAMS = False
     NORMALIZE_EEG_SPECTROGRAMS = False
     NORMALIZE_RAW_EEG = False
-    NORMALIZE_INDIVIDUALLY = True
+    NORMALIZE_INDIVIDUALLY = False
     APPLY_MSPCA_RAW_EEG = False
     APPLY_ICA_RAW_EEG = False
     APPLY_MSPCA_EEG_SPECTROGRAMS = False
@@ -144,6 +144,9 @@ class BaseFinetuning(BaseDataConfig):
 class BaseLarge(BaseDataConfig):
     BATCH_SIZE_TRAIN = 32
     ONE_SAMPLE = False
+    SHUFFLE_TRAIN = False
+    SUBSET_SAMPLE_COUNT = 0
+    BATCH_SIZE_VAL = 32
 
 
 class ExtremelySmallBaseConfig(BaseDataConfig):
