@@ -11,10 +11,13 @@ from utils.data_preprocessing_utils import create_non_overlapping_eeg_crops
 from generics import Paths, Generics
 from prettytable import PrettyTable
 from utils.general_utils import get_logger
-from utils.loader_utils import load_eeg_spectrograms, load_spectrograms
+from utils.loader_utils import load_eeg_spectrograms, load_spectrograms, load_preloaded_eeg_spectrograms, load_preloaded_spectrograms, normalize_eeg_spectrograms
 from utils.visualisation_utils import plot_eeg_combined_graph, plot_spectrogram
 from torch.utils.data import DataLoader, Dataset
 from sklearn.model_selection import train_test_split
+from utils.ica_utils import apply_ica_to_eeg_spectrograms
+from utils.mspca_utils import apply_mspca_to_eeg_spectrograms
+
 
 class CustomDataset(Dataset):
     """
@@ -33,9 +36,11 @@ class CustomDataset(Dataset):
     def __init__(
         self,
         config,
+        main_df: pd.DataFrame,
         augment: bool = False,
         mode: str = "train",
         cache: bool = True,
+        tensorboard_prefix: str = "all",
     ):
         """
         Initialize the dataset.
@@ -48,13 +53,13 @@ class CustomDataset(Dataset):
         """
         self.logger = get_logger("data_loader.log")
         self.config = config
-        self.writer = SummaryWriter(log_dir=os.path.join(Paths.TENSORBOARD_DATASETS, f'{config.NAME}_{mode}'))
+        self.main_df = main_df
+        self.label_cols = Generics.LABEL_COLS
+        self.writer = SummaryWriter(log_dir=os.path.join(Paths.TENSORBOARD_DATASETS, f'{tensorboard_prefix}/{config.NAME}_{mode}'))
         self.augment = augment
         self.mode = mode
         self.spectrograms = {}
         self.eeg_spectrograms = {}
-        self.main_df = pd.DataFrame()
-        self.label_cols = []
         
         if mode == "test":
             self.batch_size = config.BATCH_SIZE_TEST
@@ -64,16 +69,34 @@ class CustomDataset(Dataset):
             self.batch_size = config.BATCH_SIZE_TRAIN
 
         cache_file = self.generate_cache_filename(self.config.SUBSET_SAMPLE_COUNT, mode)
-        if os.path.exists(cache_file) and cache:
+        if os.path.exists(f"{Paths.CACHE_PATH_READ}{cache_file}") and cache:
             self.logger.info(f"Loading dataset from cache: {cache_file}")
             self.load_from_cache(cache_file)
         else:
             self.logger.info("Processing and caching new dataset")
-            self.load_data(self.config.SUBSET_SAMPLE_COUNT)
-            self.eeg_spectrograms = load_eeg_spectrograms(main_df=self.main_df, mode=self.mode, feats = self.config.FEATS, use_wavelet=self.config.USE_WAVELET)
-            self.spectrograms = load_spectrograms(main_df=self.main_df, mode=self.mode)
-            if self.mode == "train" and config.ONE_CROP_PER_PERSON:
-                self.main_df = create_non_overlapping_eeg_crops(self.main_df, self.label_cols)
+            if self.config.USE_PRELOADED_EEG_SPECTROGRAMS:
+                self.eeg_spectrograms = load_preloaded_eeg_spectrograms(self.main_df, custom_config=self.config.PREPROCESSING)
+            else: ### CHECKED ### load_eeg_spectrograms loads the correct number of eeg spectrograms
+                self.eeg_spectrograms = load_eeg_spectrograms(main_df=self.main_df, mode=self.mode, feats = self.config.FEATS, use_wavelet=self.config.USE_WAVELET, mspca_on_raw_eeg=self.config.APPLY_MSPCA_RAW_EEG, ica_on_raw_eeg=self.config.APPLY_ICA_RAW_EEG, custom_config=self.config.PREPROCESSING)
+            
+            if self.config.NORMALIZE_EEG_SPECTROGRAMS:
+                self.eeg_spectrograms = normalize_eeg_spectrograms(self.eeg_spectrograms, self.config.NORMALIZE_INDIVIDUALLY)
+          
+            if self.config.APPLY_ICA_EEG_SPECTROGRAMS:
+                self.eeg_spectrograms = apply_ica_to_eeg_spectrograms(self.eeg_spectrograms)
+                if self.config.NORMALIZE_EEG_SPECTROGRAMS:
+                    self.eeg_spectrograms = normalize_eeg_spectrograms(self.eeg_spectrograms, self.config.NORMALIZE_INDIVIDUALLY)
+            
+            if self.config.APPLY_MSPCA_EEG_SPECTROGRAMS:
+                self.eeg_spectrograms = apply_mspca_to_eeg_spectrograms(self.eeg_spectrograms, n_components=self.config.N_COMPONENTS)
+                if self.config.NORMALIZE_EEG_SPECTROGRAMS:
+                    self.eeg_spectrograms = normalize_eeg_spectrograms(self.eeg_spectrograms)
+          
+            if self.config.USE_PRELOADED_SPECTROGRAMS:
+                self.spectrograms = load_preloaded_spectrograms(self.main_df)   ### CHECKED ### There are only 8978 spectrograms loaded. Is that okay?
+            else:
+                self.spectrograms = load_spectrograms(main_df=self.main_df, mode=self.mode)
+                
             if cache:
               self.cache_data(cache_file)
         
@@ -90,8 +113,8 @@ class CustomDataset(Dataset):
         Returns:
             str: Filename for caching the dataset.
         """
-        config_summary = f"CustomDataset_{subset_sample_count}_{mode}_{self.config.ONE_CROP_PER_PERSON}"
-        return os.path.join(Paths.CACHE_PATH, f"{config_summary}.npz")
+        config_summary = f"{self.config.NAME}_{subset_sample_count}_{mode}"
+        return f"{config_summary}.npz"
 
     def cache_data(self, cache_file: str):
         """
@@ -100,7 +123,7 @@ class CustomDataset(Dataset):
         Args:
             cache_file (str): The file path where the dataset will be cached.
         """
-        np.savez(cache_file, 
+        np.savez(f"{Paths.CACHE_PATH_WRITE}{cache_file}", 
                  main_df=self.main_df.to_records(index=False),
                  spectrograms=self.spectrograms,
                  eeg_spectrograms=self.eeg_spectrograms)
@@ -113,56 +136,10 @@ class CustomDataset(Dataset):
         Args:
             cache_file (str): The file path from which the dataset will be loaded.
         """
-        cached_data = np.load(cache_file, allow_pickle=True)
-        self.main_df = pd.DataFrame.from_records(cached_data['main_df'])
+        cached_data = np.load(f"{Paths.CACHE_PATH_READ}{cache_file}", allow_pickle=True)
         self.spectrograms = cached_data['spectrograms'].item()
         self.eeg_spectrograms = cached_data['eeg_spectrograms'].item()
         self.label_cols = Generics.LABEL_COLS
-
-
-    def load_data(self, subset_sample_count: int = 0):
-        """
-        Load data from CSV files into a DataFrame. If 'subset_sample_count' is specified, 
-        it ensures unique samples based on different 'patient_id', picking one sample per patient.
-
-        Args:
-            subset_sample_count (int): Number of unique samples to load based on 'patient_id'. Default is 0 (load all samples).
-        """
-        try:
-            csv_path = Paths.TEST_CSV if self.mode == "test" else Paths.TRAIN_CSV
-            main_df = pd.read_csv(csv_path)
-            main_df = main_df[~main_df["eeg_id"].isin(Generics.OPT_OUT_EEG_ID)]
-            self.label_cols = main_df.columns[-6:].tolist()
-
-            if subset_sample_count > 0:
-                unique_patients = main_df['patient_id'].nunique()
-
-                if subset_sample_count > unique_patients:
-                    self.logger.warning(f"Requested {subset_sample_count} samples, but only {unique_patients} unique patients are available.")
-                    subset_sample_count = unique_patients
-
-                # Sample one record from each unique patient
-                sampled_df = main_df.groupby('patient_id').sample(n=1, random_state=42).reset_index(drop=True)
-                # If needed, further sample to meet the subset_sample_count
-                if subset_sample_count < unique_patients:
-                    sampled_df = sampled_df.sample(n=subset_sample_count, random_state=42).reset_index(drop=True)
-
-                main_df = sampled_df
-
-            if self.mode == 'val':
-                _, main_df = train_test_split(main_df, test_size=self.config.VAL_SPLIT_RATIO, random_state=42)
-            elif self.mode == 'train':
-                main_df, _ = train_test_split(main_df, test_size=self.config.VAL_SPLIT_RATIO, random_state=42)
-
-            self.main_df = main_df
-
-            self.logger.info(f"{self.mode} DataFrame shape: {self.main_df.shape}")
-            self.logger.info(f"Labels: {self.label_cols}")
-
-        except Exception as e:
-            self.logger.error(f"Error loading data: {e}")
-            raise
-
     
     def get_torch_data_loader(self):
         """
@@ -375,10 +352,3 @@ class CustomDataset(Dataset):
         except Exception as e:
             self.logger.error(f"Error plotting samples: {e}")
             raise
-
-
-    def __del__(self):
-        """
-        Destructor to close TensorBoard writer.
-        """
-        self.writer.close()

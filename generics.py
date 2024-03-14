@@ -2,8 +2,8 @@ import os
 import torch
 
 class Paths:
-    CACHE_DIR = "./data/cache/"
     PRE_LOADED_EEGS = "./data/kaggle/input/brain-eeg-spectrograms/eeg_specs.npy"
+    PRE_LOADED_CUSTOM_EEGS_DIR = "./data/cache/"
     PRE_LOADED_SPECTROGRAMS = "./data/kaggle/input/brain-spectrograms/specs.npy"
     TRAIN_CSV = (
         "./data/kaggle/input/hms-harmful-brain-activity-classification/train.csv"
@@ -20,7 +20,8 @@ class Paths:
 
     OTHER_MODEL_CHECKPOINTS = "./checkpoints/other_models/"
     BEST_MODEL_CHECKPOINTS = "./checkpoints/best_models/"
-    CACHE_PATH = "./data/cache/"
+    CACHE_PATH_READ = "./data/cache/"
+    CACHE_PATH_WRITE = "./data/cache/"
     TENSORBOARD = "./tensorboard/"
     TENSORBOARD_MODELS = "./tensorboard/models/"
     TENSORBOARD_TRAINING = "./tensorboard/training/"
@@ -30,10 +31,9 @@ class Paths:
     LOG_PATH = "./logs/"
 
 
-
-
 class Generics:
-    OPT_OUT_EEG_ID = [1457334423]
+    OPT_OUT_EEG_ID = []
+    # OPT_OUT_EEG_ID = [1457334423]
     LABEL_COLS = [
         "seizure_vote",
         "lpd_vote",
@@ -46,5 +46,5 @@ class Generics:
     DEVICE = (
         "cuda"
         if torch.cuda.is_available()
-        else "mps" if os.environ.get("CUDA_MPS_PIPE_DIRECTORY") else "mps"
+        else "mps" if torch.backends.mps.is_available() else "cpu"
     )
