@@ -2,10 +2,11 @@ import math
 import os
 import random
 import time
+from logging import INFO, FileHandler, Formatter, StreamHandler, getLogger
+
 import numpy as np
-import os
-from logging import getLogger, INFO, StreamHandler, FileHandler, Formatter
 import torch
+
 from generics import Paths
 
 
@@ -43,9 +44,6 @@ def timeSince(since: float, percent: float):
     return "%s (remain %s)" % (asMinutes(s), asMinutes(rs))
 
 
-import os
-from logging import getLogger, INFO, StreamHandler, FileHandler, Formatter
-
 def get_logger(filename):
     """
     Creates a logger with both stream and file handlers.
@@ -59,25 +57,25 @@ def get_logger(filename):
     logger = getLogger(filename)
     logger.setLevel(INFO)
 
-    # Stream Handler for console output
     handler1 = StreamHandler()
-    handler1.setFormatter(Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+    handler1.setFormatter(
+        Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    )
     logger.addHandler(handler1)
 
-    # File Handler for file output
     log_file_path = Paths.LOG_PATH + filename + ".log"
 
-    # Create directories if they don't exist (only if a directory is specified in the path)
     dir_name = os.path.dirname(log_file_path)
     if dir_name:
         os.makedirs(dir_name, exist_ok=True)
 
     handler2 = FileHandler(log_file_path)
-    handler2.setFormatter(Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+    handler2.setFormatter(
+        Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    )
     logger.addHandler(handler2)
 
     return logger
-
 
 
 def seed_everything(seed: int):

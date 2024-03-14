@@ -1,51 +1,50 @@
-
 import os
-import torch
+import time
+
 import numpy as np
 import pandas as pd
-import time
-from scipy.special import kl_div
-from datasets.data_loader import CustomDataset
-from generics import Generics, Paths
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from sklearn.metrics import mean_squared_error
+from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+
+from datasets.data_loader import CustomDataset
+from generics import Generics, Paths
 from utils.general_utils import AverageMeter, get_logger, timeSince
-from torch.optim.lr_scheduler import OneCycleLR
-from sklearn.metrics import mean_squared_error
-# Configure logger
+
 logger = get_logger(__name__)
+
 
 def train(train_dataset, val_dataset, model, tensorboard_prefix: str = "all"):
     """
-    Perform cross-validation training and validation.
+    Trains the model using the provided training and validation datasets.
 
     Args:
         train_dataset (CustomDataset): The training dataset.
         val_dataset (CustomDataset): The validation dataset.
         model (torch.nn.Module): The model to train.
+        tensorboard_prefix (str): Prefix for the TensorBoard logs.
     """
     oof_df = pd.DataFrame()
     preds, actual = train_loop(train_dataset, val_dataset, model, tensorboard_prefix)
-    # Check and reshape preds if necessary
     if len(preds.shape) == 1 or preds.shape[1] == 1:
         preds = preds.reshape(-1, len(Generics.LABEL_COLS))
 
-  
-    
     preds_df = pd.DataFrame(preds, columns=Generics.LABEL_COLS)
-    
     actual_df = pd.DataFrame(actual, columns=Generics.TARGET_PREDS)
-    
     _oof_df = pd.concat([actual_df, preds_df], axis=1)
     oof_df = pd.concat([oof_df, _oof_df]).reset_index(drop=True)
-    
     return oof_df
 
 
 def train_loop(
-    train_dataset: CustomDataset, val_dataset: CustomDataset, model, tensorboard_prefix: str = "all"
+    train_dataset: CustomDataset,
+    val_dataset: CustomDataset,
+    model,
+    tensorboard_prefix: str = "all",
 ):
     preds = []
     actual = []
@@ -72,7 +71,6 @@ def train_loop(
             final_div_factor=100,
         )
 
-        
         val_loader = val_dataset.get_torch_data_loader()
 
         for epoch in range(model_config.EPOCHS):
@@ -86,16 +84,18 @@ def train_loop(
                 epoch,
                 scheduler,
                 model.device,
-                writer
+                writer,
             )
-            # avg_val_loss, val_predictions = _valid_epoch(val_loader, model, criterion, model.device, writer, epoch)
-            # _log_epoch_results(
-            #     epoch,
-            #     avg_train_loss,
-            #     avg_val_loss,
-            #     model,
-            #     train_dataset.config.NAME,
-            # )
+            avg_val_loss, _ = _valid_epoch(
+                val_loader, model, criterion, model.device, writer, epoch
+            )
+            _log_epoch_results(
+                epoch,
+                avg_train_loss,
+                avg_val_loss,
+                model,
+                train_dataset.config.NAME,
+            )
 
             # Save the best model with fold information
             if avg_val_loss < best_loss:
@@ -115,8 +115,7 @@ def train_loop(
 
             preds.extend(probabilities.cpu().detach().numpy())
             actual.extend(targets.cpu().detach().numpy())
-            
-        
+
         writer.close()
         preds = np.array(preds)
         actual = np.array(actual)
@@ -160,8 +159,17 @@ def _configure_optimizer(model, config):
     return optimizer
 
 
-
-def _train_epoch(train_loader, val_loader, model, criterion, optimizer, epoch, scheduler, device, writer):
+def _train_epoch(
+    train_loader,
+    val_loader,
+    model,
+    criterion,
+    optimizer,
+    epoch,
+    scheduler,
+    device,
+    writer,
+):
     """
     Handles the training of the model for one epoch.
 
@@ -178,78 +186,74 @@ def _train_epoch(train_loader, val_loader, model, criterion, optimizer, epoch, s
         float: Average training loss for the epoch.
     """
     model.train()  # Set the model to training mode
-    total_loss = 0
     total_batches = len(train_loader)
     config = model.config
-    start = end = time.time()
+    start = time.time()
     scaler = torch.cuda.amp.GradScaler(enabled=config.AMP)
     losses = AverageMeter()
     softmax = nn.Softmax(dim=1)
-    i = 0
-     # ========== ITERATE OVER TRAIN BATCHES ============
-    with tqdm(train_loader, unit="train_batch", desc='Train') as tqdm_train_loader:
+    # ========== ITERATE OVER TRAIN BATCHES ============
+    with tqdm(train_loader, unit="train_batch", desc="Train") as tqdm_train_loader:
         for step, (X, y) in enumerate(tqdm_train_loader):
             X = X.to(device)
             y = y.to(device)
             batch_size = y.size(0)
             with torch.cuda.amp.autocast(enabled=config.AMP):
-                y_preds = model(X) 
+                y_preds = model(X)
                 loss = criterion(F.log_softmax(y_preds, dim=1), y)
             if config.GRADIENT_ACCUMULATION_STEPS > 1:
                 loss = loss / config.GRADIENT_ACCUMULATION_STEPS
             losses.update(loss.item(), batch_size)
             scaler.scale(loss).backward()
-            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.MAX_GRAD_NORM)
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                model.parameters(), config.MAX_GRAD_NORM
+            )
 
             if (step + 1) % config.GRADIENT_ACCUMULATION_STEPS == 0:
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad()
                 scheduler.step()
-            end = time.time()
 
             mse = mean_squared_error(y.detach().cpu(), softmax(y_preds).detach().cpu())
             writer.add_scalar("MSE/train", mse, epoch * total_batches + step)
             writer.add_scalar("Loss/train", loss.item(), epoch * total_batches + step)
             # ========== LOG INFO ==========
-            if step % config.PRINT_FREQ == 0 or step == (len(train_loader)-1):
-                print('Epoch: [{0}][{1}/{2}] '
-                      'Elapsed {remain:s} '
-                      'Loss: {loss.avg:.4f} '
-                      'Grad: {grad_norm:.4f}  '
-                      'LR: {lr:.8f}  '
-                      .format(epoch+1, step, len(train_loader), 
-                              remain=timeSince(start, float(step+1)/len(train_loader)),
-                              loss=losses,
-                              grad_norm=grad_norm,
-                              lr=scheduler.get_last_lr()[0]))
+            if step % config.PRINT_FREQ == 0 or step == (len(train_loader) - 1):
+                print(
+                    "Epoch: [{0}][{1}/{2}] "
+                    "Elapsed {remain:s} "
+                    "Loss: {loss.avg:.4f} "
+                    "Grad: {grad_norm:.4f}  "
+                    "LR: {lr:.8f}  ".format(
+                        epoch + 1,
+                        step,
+                        len(train_loader),
+                        remain=timeSince(start, float(step + 1) / len(train_loader)),
+                        loss=losses,
+                        grad_norm=grad_norm,
+                        lr=scheduler.get_last_lr()[0],
+                    )
+                )
             if step % 40 == 0:
-                _valid_epoch(val_loader, model, criterion, device, writer, epoch) 
-                avg_val_loss, val_predictions, mse_avg = _valid_epoch(val_loader, model, criterion, model.device, writer, epoch)
-                writer.add_scalar("MSE/val", mse_avg,  epoch * len(val_loader) + step)
-                writer.add_scalar("Loss/val", avg_val_loss, epoch * len(val_loader) + step)
-                # _log_epoch_results(
-                #     epoch,
-                #     avg_val_loss,
-                #     model,
-                #     train_dataset.config.NAME,
-                # )
+                _valid_epoch(val_loader, model, criterion, device, writer, epoch)
+                avg_val_loss, val_predictions, mse_avg = _valid_epoch(
+                    val_loader, model, criterion, model.device, writer, epoch
+                )
+                writer.add_scalar("MSE/val", mse_avg, epoch * len(val_loader) + step)
+                writer.add_scalar(
+                    "Loss/val", avg_val_loss, epoch * len(val_loader) + step
+                )
+                _log_epoch_results(
+                    epoch,
+                    avg_val_loss,
+                    model,
+                    model.config.NAME,
+                )
     return losses.avg
 
 
-def _valid_epoch(val_loader, model, criterion, device, writer, epoch=0):
-    """
-    Handles the validation of the model for one epoch.
-
-    Args:
-        val_loader (DataLoader): DataLoader for the validation data.
-        model (torch.nn.Module): The neural network model to validate.
-        criterion (torch.nn.Module): Loss function used for validation.
-        device (torch.device): Device on which to perform computations.
-
-    Returns:
-        float: Average validation loss for the epoch.
-    """
+def _valid_epoch(val_loader, model, criterion, device):
     model.eval()
     softmax = nn.Softmax(dim=1)
     losses = AverageMeter()
@@ -258,7 +262,7 @@ def _valid_epoch(val_loader, model, criterion, device, writer, epoch=0):
     preds = []
     start = end = time.time()
     avg_mse = []
-    with tqdm(val_loader, unit="valid_batch", desc='Validation') as tqdm_valid_loader:
+    with tqdm(val_loader, unit="valid_batch", desc="Validation") as tqdm_valid_loader:
         for step, (X, y) in enumerate(tqdm_valid_loader):
             X = X.to(device)
             y = y.to(device)
@@ -270,72 +274,33 @@ def _valid_epoch(val_loader, model, criterion, device, writer, epoch=0):
                 loss = loss / config.GRADIENT_ACCUMULATION_STEPS
             losses.update(loss.item(), batch_size)
             y_preds = softmax(y_preds)
-            preds.append(y_preds.to('cpu').numpy())
+            preds.append(y_preds.to("cpu").numpy())
             end = time.time()
             mse = mean_squared_error(y.detach().cpu(), softmax(y_preds).detach().cpu())
             avg_mse.append(mse)
             # ========== LOG INFO ==========
-            if step % config.PRINT_FREQ == 0 or step == (len(val_loader)-1):
-                print('EVAL: [{0}/{1}] '
-                      'Elapsed {remain:s} '
-                      'Loss: {loss.avg:.4f} '
-                      .format(step, len(val_loader),
-                              remain=timeSince(start, float(step+1)/len(val_loader)),
-                              loss=losses))
-                
+            if step % config.PRINT_FREQ == 0 or step == (len(val_loader) - 1):
+                print(
+                    "EVAL: [{0}/{1}] "
+                    "Elapsed {remain:s} "
+                    "Loss: {loss.avg:.4f} ".format(
+                        step,
+                        len(val_loader),
+                        remain=timeSince(start, float(step + 1) / len(val_loader)),
+                        loss=losses,
+                    )
+                )
+
     prediction_dict["predictions"] = np.concatenate(preds)
-    return losses.avg, prediction_dict, np.sum(avg_mse)/len(avg_mse)
+    return losses.avg, prediction_dict, np.sum(avg_mse) / len(avg_mse)
 
 
-def _log_epoch_results(epoch, avg_train_loss, avg_val_loss, model, dataset_name):
-    """
-    Logs the results at the end of each epoch during training and validation.
-
-    Args:
-        epoch (int): The current epoch number.
-        avg_train_loss (float): The average training loss for the epoch.
-        avg_val_loss (float): The average validation loss for the epoch.
-        prediction_dict (dict): A dictionary containing predictions and other relevant information.
-        model (torch.nn.Module): The model being trained and validated.
-        dataset_name (str): The name of the dataset used for training and validation.
-
-    Returns:
-        None
-    """
+def _log_epoch_results(avg_train_loss, avg_val_loss):
     logger.info(f"Training Loss: {avg_train_loss:.4f}")
     logger.info(f"Validation Loss: {avg_val_loss:.4f}")
 
 
-def _collect_final_predictions(val_loader, model, device):
-    """
-    Collects the final predictions from the model on the validation dataset.
-
-    Args:
-        val_loader (DataLoader): DataLoader for the validation data.
-        model (torch.nn.Module): The trained neural network model.
-        device (torch.device): Device on which to perform computations.
-
-    Returns:
-        List: A list of model predictions.
-    """
-    model.eval()  # Set the model to evaluation mode
-    predictions = []
-
-    with torch.no_grad():  # Disable gradient computation
-        for inputs, _ in val_loader:
-            inputs = inputs.to(device)
-
-            # Forward pass to get outputs/predictions
-            outputs = model(inputs)
-            outputs = torch.nn.functional.log_softmax(outputs + 1e-6, dim=1)
-            # Convert outputs to probabilities and then to CPU for further processing if needed
-            probabilities = torch.nn.functional.softmax(outputs, dim=1)
-            predictions.extend(probabilities.cpu().numpy())
-
-    return predictions
-
-
-def get_result(df, label_cols = Generics.LABEL_COLS, target_preds = Generics.TARGET_PREDS):
+def get_result(df, label_cols=Generics.LABEL_COLS, target_preds=Generics.TARGET_PREDS):
     kl_loss = nn.KLDivLoss(reduction="batchmean")
     labels = torch.tensor(df[label_cols].values)
     preds = torch.tensor(df[target_preds].values)

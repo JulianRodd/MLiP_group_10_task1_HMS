@@ -1,14 +1,11 @@
-import pandas as pd
-import numpy as np
 import librosa
 import matplotlib.pyplot as plt
-from utils.signal_preprocessing_utils import denoise
-from utils.general_utils import get_logger
-
-import pandas as pd
 import numpy as np
-import librosa
+import pandas as pd
+
 from utils.general_utils import get_logger
+from utils.signal_preprocessing_utils import denoise
+
 
 def generate_eeg_from_parquet(parquet_path: str) -> pd.DataFrame:
     """
@@ -35,7 +32,10 @@ def generate_eeg_from_parquet(parquet_path: str) -> pd.DataFrame:
         logger.error(f"Error reading Parquet file: {e}")
         raise
 
-def generate_spectrogram_from_eeg(eeg_data, feats, use_wavelet: bool, display: bool = False) -> np.ndarray:
+
+def generate_spectrogram_from_eeg(
+    eeg_data, feats, use_wavelet: bool, display: bool = False
+) -> np.ndarray:
     logger = get_logger("utils/generate_spectrogram_from_eeg")
     try:
         # Validate feats list
@@ -47,7 +47,7 @@ def generate_spectrogram_from_eeg(eeg_data, feats, use_wavelet: bool, display: b
             for col in sublist:
                 if col not in eeg_data.columns:
                     raise ValueError(f"Column '{col}' not found in eeg_data")
-                  
+
         middle = (len(eeg_data) - 10_000) // 2
         eeg = eeg_data.iloc[middle : middle + 10_000]
 
@@ -60,10 +60,11 @@ def generate_spectrogram_from_eeg(eeg_data, feats, use_wavelet: bool, display: b
             for kk in range(4):
                 x = eeg[COLS[kk]].values - eeg[COLS[kk + 1]].values
                 m = np.nanmean(x)
-                ### CHEKCED AND CHANGED: WE DID NR 1, CHRIS DOES NR 2 ###
-                # x = np.nan_to_num(x, nan=m)   # NR 1
-                if np.isnan(x).mean()<1: x = np.nan_to_num(x,nan=m)
-                else: x[:] = 0   # NR 2
+
+                if np.isnan(x).mean() < 1:
+                    x = np.nan_to_num(x, nan=m)
+                else:
+                    x[:] = 0  # NR 2
 
                 if use_wavelet:
                     x = denoise(
@@ -82,7 +83,7 @@ def generate_spectrogram_from_eeg(eeg_data, feats, use_wavelet: bool, display: b
                     fmax=20,
                     win_length=128,
                 )
-                
+
                 width = (mel_spec.shape[1] // 32) * 32
                 mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max).astype(
                     np.float32
@@ -99,7 +100,6 @@ def generate_spectrogram_from_eeg(eeg_data, feats, use_wavelet: bool, display: b
     except Exception as e:
         logger.error(f"Error processing EEG data: {e}")
         raise
-
 
 
 def _display_eeg_and_spectrogram(

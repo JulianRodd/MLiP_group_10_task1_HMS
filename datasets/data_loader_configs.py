@@ -315,7 +315,7 @@ class Config_Normalize_Group_Raw_MSPCA(BaseDataConfig):
     USE_PRELOADED_EEG_SPECTROGRAMS = False
 
 
-DATASET_GRID_SEARCH = [
+DATASET_SEARCH = [
     ExtremelySmallBaseConfig,
     SmallBaseConfig,
     SmallConfig_ICA_Normalize,

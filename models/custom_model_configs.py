@@ -121,7 +121,7 @@ class EfficientNetB1Config_Big_Weight_Decay(BaseModelConfig):
     WEIGHT_DECAY = 0.01
 
 
-MODEL_GRID_SEARCH = [
+MODEL_SEARCH = [
     EfficientNetB0Config_Big,
     EfficientNetB1Config_Big,
     EfficientNetB0Config_Big_Weight_Decay,

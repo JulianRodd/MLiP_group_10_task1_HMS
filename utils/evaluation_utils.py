@@ -1,6 +1,4 @@
 # Copied from https://www.kaggle.com/code/metric/kullback-leibler-divergence/notebook
-
-
 import numpy as np
 import pandas as pd
 import pandas.api.types
@@ -9,11 +7,18 @@ from typing import Optional
 
 from .kaggle_metric_utilities import safe_call_score, verify_valid_probabilities
 
+
 class ParticipantVisibleError(Exception):
     pass
 
 
-def kl_divergence(solution: pd.DataFrame, submission: pd.DataFrame, epsilon: float, micro_average: bool, sample_weights: Optional[pd.Series]):
+def kl_divergence(
+    solution: pd.DataFrame,
+    submission: pd.DataFrame,
+    epsilon: float,
+    micro_average: bool,
+    sample_weights: Optional[pd.Series],
+):
     # Overwrite solution for convenience
     for col in solution.columns:
         # Prevent issue with populating int columns with floats
@@ -27,7 +32,12 @@ def kl_divergence(solution: pd.DataFrame, submission: pd.DataFrame, epsilon: flo
 
         y_nonzero_indices = solution[col] != 0
         solution[col] = solution[col].astype(float)
-        solution.loc[y_nonzero_indices, col] = solution.loc[y_nonzero_indices, col] * np.log(solution.loc[y_nonzero_indices, col] / submission.loc[y_nonzero_indices, col])
+        solution.loc[y_nonzero_indices, col] = solution.loc[
+            y_nonzero_indices, col
+        ] * np.log(
+            solution.loc[y_nonzero_indices, col]
+            / submission.loc[y_nonzero_indices, col]
+        )
         # Set the loss equal to zero where y_true equals zero following the scipy convention:
         # https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.rel_entr.html#scipy.special.rel_entr
         solution.loc[~y_nonzero_indices, col] = 0
@@ -39,14 +49,14 @@ def kl_divergence(solution: pd.DataFrame, submission: pd.DataFrame, epsilon: flo
 
 
 def score_kl_divergence(
-        solution: pd.DataFrame,
-        submission: pd.DataFrame,
-        row_id_column_name: str,
-        epsilon: float=10**-15,
-        micro_average: bool=True,
-        sample_weights_column_name: Optional[str]=None
-    ) -> float:
-    ''' The Kullback–Leibler divergence.
+    solution: pd.DataFrame,
+    submission: pd.DataFrame,
+    row_id_column_name: str,
+    epsilon: float = 10**-15,
+    micro_average: bool = True,
+    sample_weights_column_name: Optional[str] = None,
+) -> float:
+    """The Kullback–Leibler divergence.
     The KL divergence is technically undefined/infinite where the target equals zero.
 
     This implementation always assigns those cases a score of zero; effectively removing them from consideration.
@@ -75,7 +85,7 @@ def score_kl_divergence(
     >>> submission = pd.DataFrame({'id': range(3), 'ham': [0.2, 0.3, 0.5], 'spam': [0.1, 0.5, 0.5], 'other': [0.7, 0.2, 0]})
     >>> score(solution, submission, 'id')
     0.160531...
-    '''
+    """
     if row_id_column_name is not None:
         del solution[row_id_column_name]
         del submission[row_id_column_name]
@@ -83,18 +93,28 @@ def score_kl_divergence(
     sample_weights = None
     if sample_weights_column_name:
         if sample_weights_column_name not in solution.columns:
-            raise ParticipantVisibleError(f'{sample_weights_column_name} not found in solution columns')
+            raise ParticipantVisibleError(
+                f"{sample_weights_column_name} not found in solution columns"
+            )
         sample_weights = solution.pop(sample_weights_column_name)
 
     if sample_weights_column_name and not micro_average:
-        raise ParticipantVisibleError('Sample weights are only valid if `micro_average` is `True`')
+        raise ParticipantVisibleError(
+            "Sample weights are only valid if `micro_average` is `True`"
+        )
 
     for col in solution.columns:
         if col not in submission.columns:
-            raise ParticipantVisibleError(f'Missing submission column {col}')
+            raise ParticipantVisibleError(f"Missing submission column {col}")
 
-    verify_valid_probabilities(solution, 'solution')
-    verify_valid_probabilities(submission, 'submission')
+    verify_valid_probabilities(solution, "solution")
+    verify_valid_probabilities(submission, "submission")
 
-
-    return safe_call_score(kl_divergence, solution, submission, epsilon=epsilon, micro_average=micro_average, sample_weights=sample_weights)
+    return safe_call_score(
+        kl_divergence,
+        solution,
+        submission,
+        epsilon=epsilon,
+        micro_average=micro_average,
+        sample_weights=sample_weights,
+    )

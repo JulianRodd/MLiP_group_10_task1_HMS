@@ -1,5 +1,5 @@
-import os
 import torch
+
 
 class Paths:
     PRE_LOADED_EEGS = "./data/kaggle/input/brain-eeg-spectrograms/eeg_specs.npy"
@@ -33,7 +33,6 @@ class Paths:
 
 class Generics:
     OPT_OUT_EEG_ID = []
-    # OPT_OUT_EEG_ID = [1457334423]
     LABEL_COLS = [
         "seizure_vote",
         "lpd_vote",
