@@ -15,6 +15,7 @@ class BaseModelConfig:
     PRINT_FREQ = 10
     ETA_MIN = 0
     AMP = False
+
     # This method is called whenever a subclass of BaseModelConfig is created
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -23,7 +24,7 @@ class BaseModelConfig:
 
 class ShuffleNetBase(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
-    MODEL = 'shufflenet_v2_x1_0'
+    MODEL = "shufflenet_v2_x1_0"
     FREEZE = False
     EPOCHS = 20
     LEARNING_RATE = 0.01
@@ -31,7 +32,7 @@ class ShuffleNetBase(BaseModelConfig):
 
 class ShuffleNetBase_Large(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
-    MODEL = 'shufflenet_v2_x1_0'
+    MODEL = "shufflenet_v2_x1_0"
     FREEZE = False
     EPOCHS = 20
     LEARNING_RATE = 0.01
@@ -40,23 +41,26 @@ class ShuffleNetBase_Large(BaseModelConfig):
 
 class ShuffleNetTest(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
-    MODEL = 'shufflenet_v2_x1_0'
+    MODEL = "shufflenet_v2_x1_0"
     FREEZE = False
-    EPOCHS = 10 
+    EPOCHS = 10
+
 
 class ResNetBase(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
-    MODEL = 'resnet50'
+    MODEL = "resnet50"
     FREEZE = False
-    EPOCHS = 10 
+    EPOCHS = 10
+
 
 class ResNetBase_LargeCF(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
-    MODEL = 'resnet50'
+    MODEL = "resnet50"
     FREEZE = False
-    EPOCHS = 10 
+    EPOCHS = 10
     LARGE_CLASSIFIER = True
     WEIGHT_DECAY = 0.01
+
 
 class EfficientNetB0Config_Big(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
@@ -64,11 +68,13 @@ class EfficientNetB0Config_Big(BaseModelConfig):
     FREEZE = False
     EPOCHS = 60
 
+
 class EfficientNetB1Config_Big(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
     MODEL = "tf_efficientnet_b1"
     FREEZE = False
     EPOCHS = 60
+
 
 class EfficientNetB0Config_Big_Weight_Decay(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
@@ -76,8 +82,8 @@ class EfficientNetB0Config_Big_Weight_Decay(BaseModelConfig):
     FREEZE = False
     EPOCHS = 60
     WEIGHT_DECAY = 0.01
-    
-    
+
+
 class EfficientNetB0Config_Big_Weight_Decay_Only_Custom_spectrograms(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
     MODEL = "tf_efficientnet_b0"
@@ -85,7 +91,8 @@ class EfficientNetB0Config_Big_Weight_Decay_Only_Custom_spectrograms(BaseModelCo
     FREEZE = False
     EPOCHS = 60
     WEIGHT_DECAY = 0.01
-    
+
+
 class EfficientNetB0Config_Big_Weight_Decay_FROZEN_32(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
     MODEL = "tf_efficientnet_b0"
@@ -94,15 +101,18 @@ class EfficientNetB0Config_Big_Weight_Decay_FROZEN_32(BaseModelConfig):
     EPOCHS = 60
     WEIGHT_DECAY = 0.01
 
+
 class EfficientNetB1Config_Big_Weight_Decay(BaseModelConfig):
     GRADIENT_ACCUMULATION_STEPS = 1
     MODEL = "tf_efficientnet_b1"
     FREEZE = False
     EPOCHS = 60
     WEIGHT_DECAY = 0.01
-    
-    
-  
 
 
-MODEL_GRID_SEARCH = [EfficientNetB0Config_Big, EfficientNetB1Config_Big, EfficientNetB0Config_Big_Weight_Decay, EfficientNetB1Config_Big_Weight_Decay]
+MODEL_GRID_SEARCH = [
+    EfficientNetB0Config_Big,
+    EfficientNetB1Config_Big,
+    EfficientNetB0Config_Big_Weight_Decay,
+    EfficientNetB1Config_Big_Weight_Decay,
+]

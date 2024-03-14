@@ -237,9 +237,13 @@ def normalize_eeg_spectrograms(eeg_spectrograms: Dict[int, np.ndarray], normaliz
       mean = np.mean(eeg_data, axis=(0, 1, 2))
       std = np.std(eeg_data, axis=(0, 1, 2))
       for eeg_id, eeg_data in eeg_spectrograms.items():
-          normalized_eeg = (eeg_data - mean) / std
-          normalized_eegs[eeg_id] = normalized_eeg
-      
+          try:
+            normalized_eeg = (eeg_data - mean) / std
+            normalized_eegs[eeg_id] = normalized_eeg
+          except Exception as e:
+            print(f"Error normalizing eeg {eeg_id}: {e}")
+            normalized_eegs[eeg_id] = eeg_data
+    
     return normalized_eegs
 
 def load_preloaded_spectrograms(main_df: pd.DataFrame):

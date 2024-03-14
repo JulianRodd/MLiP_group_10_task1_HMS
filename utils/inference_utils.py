@@ -82,20 +82,26 @@ def create_submission(test_df, predictions, target_columns, submission_file):
     predictions = np.around(predictions, decimals=8, out=None)
     predictions = np.float16(predictions)
     predictions = predictions / np.sum(predictions, axis=1)[:, np.newaxis]
-    if not np.allclose(np.sum(predictions, axis = 1), np.float(1.0), atol=1e-16, rtol=1e-16):
+    if not np.allclose(np.sum(predictions, axis = 1), float(1.0), atol=1e-16, rtol=1e-16):
         raise TypeError(f'Predictions must sum to one! Predictions: {predictions}')
 
     # Create a DataFrame for submission
-    submission_df = pd.DataFrame(predictions, columns=target_columns)
+    submission_df = pd.DataFrame(predictions, columns=target_columns, dtype='float16')
     submission_df['eeg_id'] = test_df['eeg_id'].values
 
     # Reorder the columns to have 'eeg_id' first
     column_order = ['eeg_id'] + target_columns
     submission_df = submission_df[column_order]
-    submission_df = submission_df.astype({'eeg_id': int})
+    submission_df = submission_df.astype({'eeg_id': int,
+                                          'seizure_vote': 'float16',
+                                          'lpd_vote': 'float16',
+                                          'gpd_vote': 'float16',
+                                          'lrda_vote': 'float16',
+                                          'grda_vote': 'float16',
+                                          'other_vote': 'float16'})
     submission_df.head()
     # Save the submission file
-    submission_df.to_csv(submission_file, index=None)
+    submission_df.to_csv(submission_file, index=None, float_format='%.32f')
 
     print(f'Submission shape: {submission_df.shape}')
     return submission_df
