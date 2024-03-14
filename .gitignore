@@ -2,10 +2,12 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+*.DS_STORE
 # C extensions
 *.so
-
+/data
+/logs
+/tensorboard
 # Distribution / packaging
 .Python
 build/
